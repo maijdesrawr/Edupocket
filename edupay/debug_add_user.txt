@@ -1,0 +1,216 @@
+Array
+(
+    [category] => student
+    [name] => Julius Ajose
+    [student_num] => 12123345579
+    [parent_id] => P20231102208
+    [balance] => 00.00
+)
+Array
+(
+    [category] => student
+    [name] => Julius Ajose
+    [student_num] => 12930024485
+    [parent_id] => P20231102208
+    [balance] => 0
+)
+Array
+(
+    [category] => student
+    [name] => Julius Ajose
+    [student_num] => 20214405689
+    [parent_id] => P20231102208
+    [balance] => 0
+)
+Array
+(
+    [category] => student
+    [name] => Julius Ajose
+    [student_num] => 20192203394
+    [parent_id] => P20231102208
+    [balance] => 0
+)
+Array
+(
+    [category] => student
+    [name] => Julius Ajose
+    [student_num] => 20192298804
+    [parent_id] => P20231102208
+    [balance] => 0
+    [password] => jul123
+)
+Array
+(
+    [category] => student
+    [name] => Julius Ajose
+    [student_num] => 20171102206
+    [parent_id] => P20231102208
+    [balance] => 0
+    [password] => jul123
+)
+Array
+(
+    [category] => student
+    [name] => Julius Ajose
+    [student_num] => 20171102208
+    [parent_id] => P20231102208
+    [balance] => 0
+    [password] => jul123
+)
+Array
+(
+    [category] => parent
+    [name] => Maria Santos
+    [parent_id] => 29472937383
+    [linked_student] => 37749439933
+    [email] => maria_santos@gmail.com
+)
+Array
+(
+    [category] => parent
+    [name] => Mark Salvador
+    [parent_id] => 29472937383
+    [linked_student] => 37749439933
+    [email] => mark_salvador@gmail.com
+)
+Array
+(
+    [category] => student
+    [name] => June Salvador
+    [student_num] => 37749439933
+    [parent_id] => 29472937383
+    [balance] => 0
+    [password] => june123
+)
+Array
+(
+    [category] => parent
+    [name] => Agostine Salvador
+    [parent_id] => 29472937383
+    [linked_student] => 37749439933
+    [email] => agostine_salvador@gmail.com
+    [password] => agostine123
+)
+Array
+(
+    [category] => student
+    [name] => June Salvador
+    [student_num] => 37749439933
+    [parent_id] => 29472937383
+    [balance] => 0
+    [password] => june123
+)
+Array
+(
+    [category] => parent
+    [name] => Vicky Ignacio
+    [parent_id] => 62537272776
+    [linked_student] => 20231105069
+    [email] => vicky_ignacio@gmail.com
+    [password] => vicky123
+)
+Array
+(
+    [category] => student
+    [name] => Raizza Ignacio
+    [student_num] => 20231105069
+    [parent_id] => 62537272776
+    [balance] => 0
+    [password] => raizza123
+)
+Array
+(
+    [category] => student
+    [name] => Raizza Ignacio
+    [student_num] => 20231105069
+    [parent_id] => 62537272776
+    [balance] => 0
+    [password] => raizza123
+)
+Array
+(
+    [category] => student
+    [name] => Ricky Ignacio
+    [student_num] => 202512345
+    [parent_id] => 62537272776
+    [balance] => 500
+    [password] => ricky123
+)
+Array
+(
+    [category] => student
+    [name] => Ricky Ignacio
+    [student_num] => 202412345
+    [parent_id] => 62537272776
+    [balance] => 100
+    [password] => ricky2
+)
+Array
+(
+    [category] => student
+    [name] => Alyzza
+    [student_num] => 20231105069
+    [parent_id] => 62537272776
+    [balance] => 1000
+    [password] => testlang
+)
+Array
+(
+    [category] => student
+    [name] => Maria Ajose
+    [student_num] => 20231102208
+    [parent_id] => P20231102208
+    [balance] => 0
+    [password] => maria123
+)
+Array
+(
+    [category] => student
+    [name] => Alyzza Cruz
+    [student_num] => 20231134557
+    [balance] => 0
+    [password] => alyzza123
+)
+Array
+(
+    [category] => parent
+    [name] => Vicky Cruz
+    [parent_id] => 8264847482
+    [linked_student] => 20231134557
+    [email] => vicky_cruz@gmail.com
+    [password] => vicky123
+)
+Array
+(
+    [category] => pos
+    [name] => Canteen C
+    [canteen_id] => 837282
+    [location] => over there
+)
+Array
+(
+    [category] => student
+    [name] => Pedro Roque11
+    [student_num] => 163738923
+    [parent_id] => 363784875
+    [balance] => -100
+    [password] => pedro123
+)
+Array
+(
+    [category] => parent
+    [name] => Riel Roque
+    [parent_id] => 737493838
+    [linked_student] => 363784875
+    [email] => riel_roque@gmail.com
+    [password] => riel123
+)
+Array
+(
+    [category] => parent
+    [name] => Riel Roque
+    [parent_id] => 363784875
+    [linked_student] => 163738923948
+    [email] => riel@gmail.com
+    [password] => riel456
+)
