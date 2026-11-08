@@ -1984,6 +1984,15 @@ ALTER TABLE `transaction_receipts`
   ADD CONSTRAINT `fk_transaction_receipt_transaction` FOREIGN KEY (`transaction_id`) REFERENCES `transactions` (`transaction_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 COMMIT;
 
+ALTER TABLE topups
+MODIFY COLUMN method ENUM(
+    'Bank',
+    'GCash',
+    'Maya',
+    'QR Ph',
+    'Over-the-counter'
+) NOT NULL;
+
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
