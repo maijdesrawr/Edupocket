@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-
+import 'parent_graphs.dart';
 import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
@@ -179,37 +179,54 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
   }
 
   void _onItemTapped(int index) {
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) =>
-              ParentDashboard(name: widget.userName, id: widget.userId),
-        ),
-      );
-      return;
-    }
-    if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) =>
-              TopUpContent(userName: widget.userName, userId: widget.userId),
-        ),
-      );
-      return;
-    }
-    if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => TransactionHistoryPage(
-            userName: widget.userName,
-            userId: widget.userId,
+    switch (index) {
+      case 0:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                ParentDashboard(name: widget.userName, id: widget.userId),
           ),
-        ),
-      );
-      return;
+        );
+        break;
+
+      case 1:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ParentGraphs(
+              name: widget.userName,
+              id: widget.userId,
+              children: const [],
+            ),
+          ),
+        );
+        break;
+
+      case 2:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                TopUpContent(userName: widget.userName, userId: widget.userId),
+          ),
+        );
+        break;
+
+      case 3:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TransactionHistoryPage(
+              userName: widget.userName,
+              userId: widget.userId,
+            ),
+          ),
+        );
+        break;
+
+      case 4:
+        break;
     }
   }
 

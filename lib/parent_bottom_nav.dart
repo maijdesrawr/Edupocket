@@ -15,12 +15,13 @@ class ParentBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
+    return Container(
+      color: _primaryRed,
       child: Container(
-        color: _primaryRed,
+        decoration: const BoxDecoration(
+          color: _primaryRed,
+        ),
         child: Container(
-          height: 92,
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.only(
@@ -35,15 +36,22 @@ class ParentBottomNav extends StatelessWidget {
               ),
             ],
           ),
-          padding: const EdgeInsets.fromLTRB(26, 14, 26, 14),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(0, Icons.home_rounded),
-              _buildNavItem(1, Icons.payments_outlined),
-              _buildNavItem(2, Icons.history_rounded),
-              _buildNavItem(3, Icons.person_outline_rounded),
-            ],
+          child: SafeArea(
+            top: false,
+            child: Container(
+              height: 92,
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(0, Icons.home_rounded),
+                  _buildNavItem(1, Icons.bar_chart_rounded),
+                  _buildNavItem(2, Icons.payments_outlined),
+                  _buildNavItem(3, Icons.history_rounded),
+                  _buildNavItem(4, Icons.person_outline_rounded),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -58,7 +66,7 @@ class ParentBottomNav extends StatelessWidget {
       onTap: () => onTap(index),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        width: 56,
+        width: 52,
         height: 56,
         decoration: BoxDecoration(
           color: selected ? _deepRed : Colors.transparent,

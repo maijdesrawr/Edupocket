@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import 'parent_graphs.dart';
 import 'api_config.dart';
 import 'receipt_action.dart';
 import 'app_session_service.dart';
@@ -104,7 +105,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
             data['activities'] ?? const [],
           );
 
-          if (!mounted || _isUpdatingFreeze || freezeRevision != _freezeRevision) {
+          if (!mounted ||
+              _isUpdatingFreeze ||
+              freezeRevision != _freezeRevision) {
             _isFetchingDashboard = false;
             return;
           }
@@ -301,6 +304,23 @@ class _ParentDashboardState extends State<ParentDashboard> {
     }
 
     if (index == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ParentGraphs(
+            name: widget.name,
+            id: widget.id,
+            children: _children,
+            selectedChildId: _selectedChild == null
+                ? null
+                : (_selectedChild!['child_id'] ?? '').toString(),
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (index == 2) {
       final result = await Navigator.push(
         context,
         MaterialPageRoute(
@@ -318,23 +338,27 @@ class _ParentDashboardState extends State<ParentDashboard> {
       return;
     }
 
-    if (index == 2) {
+    if (index == 3) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) =>
-              TransactionHistoryPage(userName: widget.name, userId: widget.id),
+          builder: (context) => TransactionHistoryPage(
+            userName: widget.name,
+            userId: widget.id,
+          ),
         ),
       );
       return;
     }
 
-    if (index == 3) {
+    if (index == 4) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) =>
-              ParentProfilePage(userName: widget.name, userId: widget.id),
+          builder: (context) => ParentProfilePage(
+            userName: widget.name,
+            userId: widget.id,
+          ),
         ),
       );
     }

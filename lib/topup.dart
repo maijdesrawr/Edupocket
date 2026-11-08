@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'parent_graphs.dart';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -134,10 +135,28 @@ class _TopUpContentState extends State<TopUpContent> {
     }
 
     if (index == 1) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ParentGraphs(
+            name: widget.userName,
+            id: widget.userId,
+            children: _children.map((child) {
+              return {
+                'child_id': child['id'],
+                'child_name': child['name'],
+                'balance': 0,
+              };
+            }).toList(),
+          ),
+        ),
+      );
       return;
     }
 
-    if (index == 2) {
+    if (index == 2) return;
+
+    if (index == 3) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -150,7 +169,7 @@ class _TopUpContentState extends State<TopUpContent> {
       return;
     }
 
-    if (index == 3) {
+    if (index == 4) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -399,7 +418,7 @@ class _TopUpContentState extends State<TopUpContent> {
         ),
       ),
       bottomNavigationBar: ParentBottomNav(
-        selectedIndex: 1,
+        selectedIndex: 2,
         onTap: _onItemTapped,
       ),
     );

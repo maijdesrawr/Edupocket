@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-
+import 'parent_graphs.dart';
 import 'app_session_service.dart';
 import 'api_config.dart';
 import 'parent.dart';
@@ -173,6 +173,27 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
+          builder: (context) => ParentGraphs(
+            name: widget.userName,
+            id: widget.userId,
+            children: _children.map((child) {
+              return {
+                'child_id': child['student_num'],
+                'child_name': child['Fname'],
+                'balance': 0,
+              };
+            }).toList(),
+            selectedChildId: _selectedChildId,
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (index == 2) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
           builder: (context) =>
               TopUpContent(userName: widget.userName, userId: widget.userId),
         ),
@@ -180,11 +201,9 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
       return;
     }
 
-    if (index == 2) {
-      return;
-    }
+    if (index == 3) return;
 
-    if (index == 3) {
+    if (index == 4) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -284,7 +303,7 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
         ),
       ),
       bottomNavigationBar: ParentBottomNav(
-        selectedIndex: 2,
+        selectedIndex: 3,
         onTap: _onItemTapped,
       ),
     );
