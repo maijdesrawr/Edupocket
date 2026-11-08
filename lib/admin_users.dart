@@ -321,9 +321,9 @@ class _AdminUsersState extends State<AdminUsers> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      _buildSearchField(),
-                      const SizedBox(height: 16),
                       _buildCategoryTabs(),
+                      const SizedBox(height: 12),
+                      _buildSearchField(),
                       const SizedBox(height: 22),
                       Expanded(
                         child: Stack(
