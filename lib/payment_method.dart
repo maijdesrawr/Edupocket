@@ -41,6 +41,7 @@ class _PaymentMethodPageState extends State<PaymentMethodPage>
   String? _failureMessage;
   Timer? _statusTimer;
   bool _foreground = true;
+  bool _checkPending = false;
 
   @override
   void initState() {
@@ -57,8 +58,13 @@ class _PaymentMethodPageState extends State<PaymentMethodPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
-    if (_foreground && _failureMessage == null) {
-      unawaited(_checkPayment(silent: true));
+
+    if (_foreground && _checkoutId != null && _failureMessage == null) {
+      if (_busy) {
+        _checkPending = true;
+      } else {
+        unawaited(_checkPayment(silent: true));
+      }
     }
   }
 
@@ -151,6 +157,11 @@ class _PaymentMethodPageState extends State<PaymentMethodPage>
     } finally {
       if (mounted) {
         setState(() => _busy = false);
+
+        if (_checkPending && _foreground && _checkoutId != null) {
+          _checkPending = false;
+          unawaited(_checkPayment(silent: true));
+        }
       }
     }
   }
@@ -486,6 +497,20 @@ class _PaymentMethodPageState extends State<PaymentMethodPage>
               ),
 
               // --------------------------------------------------
+              // QR PH
+              // --------------------------------------------------
+              const SizedBox(height: 14),
+
+              _paymentMethodCard(
+                icon: Icons.qr_code_2_rounded,
+                title: 'QR Ph',
+                subtitle: 'Pay using any participating bank or e-wallet app',
+                iconColor: Colors.deepPurple,
+                enabled: !_busy && _checkoutId == null,
+                onTap: () => _startPayMongo(context, 'QR Ph'),
+              ),
+
+              // --------------------------------------------------
               // CHECKOUT STATUS
               // --------------------------------------------------
 
@@ -520,9 +545,8 @@ class _PaymentMethodPageState extends State<PaymentMethodPage>
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
                       const Text(
-                        'Finish your payment in the browser, then return here to check the payment status.',
+                        'Complete your payment in the browser. Your receipt will appear automatically once the payment is confirmed.',
                         style: TextStyle(
                           color: Colors.grey,
                           height: 1.4,

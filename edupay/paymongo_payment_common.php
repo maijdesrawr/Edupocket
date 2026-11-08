@@ -284,7 +284,7 @@ function pm_fulfill_verified_checkout(
         $amountCentavos = pm_amount_centavos($pending['amount'] ?? '');
         $amount = number_format($amountCentavos / 100, 2, '.', '');
         $method = trim((string)$pending['method']);
-        if (!in_array($method, ['GCash', 'Maya'], true)
+        if (!in_array($method, ['GCash', 'Maya', 'QR Ph'], true)
             || $amountCentavos !== $verifiedAmountCentavos
             || $amountCentavos <= 0) {
             throw new RuntimeException('The verified payment details are invalid.');

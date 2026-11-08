@@ -47,7 +47,7 @@ if ($parentId === '' || $studentNumber === '' || $amount === false
         'message' => 'Enter valid payment details and an amount from PHP 1.00 to PHP 100,000.00.',
     ], 400);
 }
-if (!in_array($method, ['GCash', 'Maya'], true)) {
+if (!in_array($method, ['GCash', 'Maya', 'QR Ph'], true)) {
     checkout_respond(['status' => 'error', 'message' => 'Invalid payment method.'], 400);
 }
 
@@ -102,7 +102,11 @@ try {
     $callbackToken = 'EP-' . bin2hex(random_bytes(24));
     $callbackTokenHash = hash('sha256', $callbackToken);
     $amountCentavos = (int)round($amount * 100);
-    $paymentMethodType = $method === 'GCash' ? 'gcash' : 'paymaya';
+    $paymentMethodType = match ($method) {
+    'GCash' => 'gcash',
+    'Maya' => 'paymaya',
+    'QR Ph' => 'qrph',
+};
 
     $request = [
         'data' => [
