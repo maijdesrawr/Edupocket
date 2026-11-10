@@ -424,9 +424,6 @@ $initials = substr($initials, 0, 2);
         </section>
 
 
-        <!-- =====================================
-             TRANSACTION HISTORY
-        ====================================== -->
 
         <section
             class="card"

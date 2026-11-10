@@ -7,7 +7,6 @@ require_once __DIR__ . '/../rawr/edupay/password_change_common.php';
 const TEST_API_BASE = 'http://127.0.0.1/edupay';
 const TEST_CURRENT_PASSWORD = 'LegacyCurrent1!';
 
-/** @return array<string, mixed> */
 function test_post(string $endpoint, array $fields): array
 {
     $handle = curl_init(TEST_API_BASE . '/' . $endpoint);
@@ -45,7 +44,6 @@ function test_assert(bool $condition, string $message): void
     }
 }
 
-/** @return array<int, array{role:string,id:string,new_password:string}> */
 function test_accounts(): array
 {
     return [

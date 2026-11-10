@@ -6,9 +6,6 @@ ini_set('display_errors', 1);
 require_once "db.php";
 
 
-/* =========================================================
-   TOTAL CASHIERS
-========================================================= */
 
 $totalCashiersQuery = "
     SELECT COUNT(*) AS total_cashiers
@@ -25,9 +22,6 @@ $totalCashiersData = $totalCashiersResult->fetch_assoc();
 $totalCashiers = $totalCashiersData["total_cashiers"];
 
 
-/* =========================================================
-   CANTEENS
-========================================================= */
 
 $canteensQuery = "
     SELECT COUNT(*) AS total_canteens
@@ -56,9 +50,6 @@ if (!$canteensResult) {
 }
 
 
-/* =========================================================
-   CASHIERS
-========================================================= */
 
 $cashiersQuery = "
     SELECT
@@ -79,9 +70,6 @@ if (!$cashiersResult) {
 }
 
 
-/* =========================================================
-   CANTEEN OPTIONS
-========================================================= */
 
 $canteenOptions = [];
 
@@ -139,9 +127,6 @@ if ($canteenOptionsResult) {
 <div class="app">
 
 
-    <!-- =====================================================
-         SIDEBAR
-    ====================================================== -->
 
     <aside class="sidebar">
 
@@ -168,7 +153,6 @@ if ($canteenOptionsResult) {
         </div>
 
 
-        <!-- USER MANAGEMENT -->
 
         <div class="nav-title">
             User Management
@@ -229,7 +213,6 @@ if ($canteenOptionsResult) {
         </nav>
 
 
-        <!-- TRANSACTION RECORDS -->
 
         <div class="nav-title finance-title">
 
@@ -270,7 +253,6 @@ if ($canteenOptionsResult) {
         </nav>
 
 
-        <!-- SIDEBAR FOOTER -->
 
         <div class="sidebar-footer">
 
@@ -302,15 +284,9 @@ if ($canteenOptionsResult) {
     </aside>
 
 
-    <!-- =====================================================
-         MAIN
-    ====================================================== -->
     <main>
 
 
-        <!-- =================================================
-             PAGE HEADER
-        ================================================== -->
 
         <div class="topbar">
 
@@ -339,9 +315,6 @@ if ($canteenOptionsResult) {
         </div>
 
 
-        <!-- =================================================
-             SUMMARY
-        ================================================== -->
 
         <div class="student-summary-row">
 
@@ -376,9 +349,6 @@ if ($canteenOptionsResult) {
 </div>
 
 
-        <!-- =================================================
-             REGISTERED CANTEENS
-        ================================================== -->
 
         <section class="card table-card">
 
@@ -459,7 +429,6 @@ if ($canteenOptionsResult) {
                                 $canteen["balance"];
 
 
-                            /* GET INITIALS */
 
                             $words = explode(
                                 " ",
@@ -504,7 +473,6 @@ if ($canteenOptionsResult) {
                         <tr>
 
 
-                            <!-- CANTEEN -->
 
                             <td>
 
@@ -548,7 +516,6 @@ if ($canteenOptionsResult) {
                             </td>
 
 
-                            <!-- CANTEEN ID -->
 
                             <td>
 
@@ -563,7 +530,6 @@ if ($canteenOptionsResult) {
                             </td>
 
 
-                            <!-- LOCATION -->
 
                             <td>
 
@@ -578,7 +544,6 @@ if ($canteenOptionsResult) {
                             </td>
 
 
-                            <!-- BALANCE -->
 
                             <td>
 
@@ -594,7 +559,6 @@ if ($canteenOptionsResult) {
                             </td>
 
 
-                            <!-- ACTIONS -->
 
                             <td>
 
@@ -676,9 +640,6 @@ if ($canteenOptionsResult) {
 
 
 
-        <!-- =================================================
-             REGISTERED CASHIERS
-        ================================================== -->
 
         <section class="card table-card">
 
@@ -762,7 +723,6 @@ if ($canteenOptionsResult) {
                                 $cashier["profile_photo"];
 
 
-                            /* GET INITIALS */
 
                             $words = explode(
                                 " ",
@@ -807,7 +767,6 @@ if ($canteenOptionsResult) {
                         <tr>
 
 
-                            <!-- CASHIER -->
 
                             <td>
 
@@ -892,7 +851,6 @@ if ($canteenOptionsResult) {
                             </td>
 
 
-                            <!-- CASHIER NUMBER -->
 
                             <td>
 
@@ -907,7 +865,6 @@ if ($canteenOptionsResult) {
                             </td>
 
 
-                            <!-- CANTEEN ID -->
 
                             <td>
 
@@ -922,7 +879,6 @@ if ($canteenOptionsResult) {
                             </td>
 
 
-                            <!-- BALANCE -->
 
                             <td>
 
@@ -938,7 +894,6 @@ if ($canteenOptionsResult) {
                             </td>
 
 
-                            <!-- ACTIONS -->
 
                             <td>
 
@@ -1020,9 +975,6 @@ if ($canteenOptionsResult) {
 
 
 
-        <!-- =================================================
-             NEW CASHIER MODAL
-        ================================================== -->
 
         <div
             id="cashierModal"
@@ -1069,7 +1021,6 @@ if ($canteenOptionsResult) {
                     >
 
 
-                    <!-- CASHIER INFORMATION -->
 
                     <div class="form-section">
 
@@ -1169,7 +1120,6 @@ if ($canteenOptionsResult) {
                     </div>
 
 
-                    <!-- MODAL ACTIONS -->
 
                     <div class="modal-actions">
 
@@ -1208,9 +1158,6 @@ if ($canteenOptionsResult) {
 
 
 
-        <!-- =================================================
-             NEW POS / CANTEEN MODAL
-        ================================================== -->
 
         <div
             id="posModal"
@@ -1257,7 +1204,6 @@ if ($canteenOptionsResult) {
                     >
 
 
-                    <!-- CANTEEN INFORMATION -->
 
                     <div class="form-section">
 
@@ -1351,7 +1297,6 @@ if ($canteenOptionsResult) {
                     </div>
 
 
-                    <!-- MODAL ACTIONS -->
 
                     <div class="modal-actions">
 
@@ -1390,7 +1335,6 @@ if ($canteenOptionsResult) {
 
 
 
-        <!-- SUCCESS MESSAGE MODAL -->
         <div id="creationSuccessModal" class="modal" style="display:none; z-index:9999;">
             <div class="modal-content" style="max-width:480px; text-align:center;">
                 <div style="font-size:48px; margin-bottom:10px;">&#10003;</div>
@@ -1417,9 +1361,6 @@ if ($canteenOptionsResult) {
 <script>
 
 
-/* =========================================================
-   CASHIER MODAL
-========================================================= */
 
 function openCashierModal() {
 
@@ -1457,9 +1398,6 @@ function closeCashierModal() {
 }
 
 
-/* =========================================================
-   POS MODAL
-========================================================= */
 
 function openPosModal() {
 
@@ -1497,9 +1435,6 @@ function closePosModal() {
 }
 
 
-/* =========================================================
-   CLOSE MODALS WHEN CLICKING OUTSIDE
-========================================================= */
 
 window.addEventListener(
     "click",
@@ -1542,9 +1477,6 @@ window.addEventListener(
 );
 
 
-/* =========================================================
-   VIEW CANTEEN
-========================================================= */
 
 function viewCanteen(
     canteenID
@@ -1559,9 +1491,6 @@ function viewCanteen(
 }
 
 
-/* =========================================================
-   DELETE CANTEEN
-========================================================= */
 
 function deleteCanteen(
     canteenID
@@ -1587,9 +1516,6 @@ function deleteCanteen(
 }
 
 
-/* =========================================================
-   VIEW CASHIER
-========================================================= */
 
 function viewCashier(
     cashierID
@@ -1604,9 +1530,6 @@ function viewCashier(
 }
 
 
-/* =========================================================
-   DELETE CASHIER
-========================================================= */
 
 function deleteCashier(
     cashierID
@@ -1632,9 +1555,6 @@ function deleteCashier(
 }
 
 
-/* =========================================================
-   SEARCH CASHIERS
-========================================================= */
 
 function searchCashiers(
     searchValue
@@ -1677,9 +1597,6 @@ function searchCashiers(
 
 
 
-/* =========================================================
-   CREATE POS / CANTEEN AND CASHIER WITH SUCCESS MESSAGE
-========================================================= */
 
 function showCreationSuccess(data) {
     const modal = document.getElementById("creationSuccessModal");

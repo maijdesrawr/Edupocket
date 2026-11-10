@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'admin_home.dart';
 import 'admin_profile.dart';
 import 'admin_report.dart';
+import 'app_session_service.dart';
 import 'api_config.dart';
 import 'koyah_nadagdag.dart';
 import 'user_details.dart';
@@ -41,6 +42,7 @@ class _AdminUsersState extends State<AdminUsers> {
 
   int _selectedIndex = 1;
   String _activeCategory = 'student';
+  String? _selectedAction;
 
   final Map<String, List<dynamic>> _users = {
     'student': [],
@@ -96,39 +98,13 @@ class _AdminUsersState extends State<AdminUsers> {
     }
   }
 
-  Future<void> _unlockStudent(Map<String, dynamic> user) async {
-    try {
-      final response = await http.post(
-        Uri.parse(ApiConfig.url('unlock_student.php')),
-        body: {
-          'student_num': user['student_num'].toString(),
-          'admin_id': widget.adminId,
-        },
-      );
-
-      final data = json.decode(response.body) as Map<String, dynamic>;
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text((data['message'] ?? 'Request completed').toString())),
-      );
-
-      if (data['status'] == 'success') {
-        setState(() => user['is_locked'] = 0);
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
-  }
-
   void _switchCategory(String category) {
     if (category == _activeCategory) return;
 
-    setState(() => _activeCategory = category);
+    setState(() {
+      _activeCategory = category;
+      _selectedAction = null;
+    });
     _syncSearchField();
     fetchUsers(category);
   }
@@ -236,6 +212,159 @@ class _AdminUsersState extends State<AdminUsers> {
     }
   }
 
+  Object? _userId(Map<String, dynamic> user) {
+    switch (_activeCategory) {
+      case 'student':
+        return user['student_num'];
+      case 'parent':
+        return user['parent_id'];
+      case 'pos':
+        return user['canteen_id'];
+      case 'cashier':
+        return user['cashier_id'];
+      default:
+        return null;
+    }
+  }
+
+  Future<void> _handleUserTap(Map<String, dynamic> user) async {
+    switch (_selectedAction) {
+      case 'edit':
+        final changed = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UserEditPage(user: user, category: _activeCategory),
+          ),
+        );
+        if (changed == true) await fetchUsers(_activeCategory, force: true);
+        break;
+      case 'delete':
+        await _confirmDeleteUser(user);
+        break;
+      case 'lock':
+        await _confirmToggleLock(user);
+        break;
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Choose Edit, Delete, or Lock first.')),
+        );
+    }
+  }
+
+  Future<void> _confirmDeleteUser(Map<String, dynamic> user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete User?'),
+        content: Text(
+          'Delete ${_displayName(user)}? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _deepRed),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConfig.url('account_delete.php')),
+      headers: AppSessionService.instance.authorizationHeaders,
+      body: {'category': _activeCategory, 'id': _userId(user)?.toString() ?? ''},
+      );
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      if (!mounted) return;
+      if (response.statusCode == 200 && data['status'] == 'success') {
+        setState(() {
+          _users[_activeCategory]?.remove(user);
+          _selectedAction = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text((data['message'] ?? 'User deleted.').toString())),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text((data['message'] ?? 'Could not delete user.').toString())),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not delete this user. Try again.')),
+      );
+    }
+  }
+
+  Future<void> _confirmToggleLock(Map<String, dynamic> user) async {
+    final locked = ['1', 'true'].contains(user['is_locked']?.toString().toLowerCase());
+    final action = locked ? 'unlock' : 'lock';
+    final accountType = _categoryLabel(_activeCategory);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('${locked ? 'Unlock' : 'Lock'} $accountType?'),
+        content: Text(locked
+            ? 'Allow ${_displayName(user)} to use this account again?'
+            : 'Lock this account? ${_displayName(user)} will not be able to access it.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _deepRed),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(locked ? 'Unlock' : 'Lock'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final isStudent = _activeCategory == 'student';
+      final response = await http.post(
+        Uri.parse(ApiConfig.url(
+            isStudent ? 'student_manual_lock.php' : 'admin_account_lock.php')),
+        headers: AppSessionService.instance.authorizationHeaders,
+        body: isStudent
+            ? {'student_num': _userId(user)?.toString() ?? '', 'action': action}
+            : {
+                'category': _activeCategory,
+                'id': _userId(user)?.toString() ?? '',
+                'account_source': (user['account_source'] ?? '').toString(),
+                'action': action,
+              },
+      );
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      if (!mounted) return;
+      if (response.statusCode == 200 && data['status'] == 'success') {
+        await fetchUsers(_activeCategory, force: true);
+        setState(() => _selectedAction = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text((data['message'] ?? 'Account status updated.').toString())),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text((data['message'] ?? 'Could not update account status.').toString())),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not update this account. Try again.')),
+      );
+    }
+  }
+
   void _onNavTap(int index) {
     if (index == _selectedIndex) return;
 
@@ -321,6 +450,8 @@ class _AdminUsersState extends State<AdminUsers> {
                         ],
                       ),
                       const SizedBox(height: 16),
+                      _buildActionButtons(),
+                      const SizedBox(height: 12),
                       _buildCategoryTabs(),
                       const SizedBox(height: 12),
                       _buildSearchField(),
@@ -351,6 +482,56 @@ class _AdminUsersState extends State<AdminUsers> {
         ),
       ),
       bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Row(
+      children: [
+        _actionButton('edit', Icons.edit_outlined, 'Edit'),
+        const SizedBox(width: 8),
+        _actionButton('delete', Icons.delete_outline, 'Delete'),
+        const SizedBox(width: 8),
+        _actionButton('lock', Icons.lock_outline, 'Lock'),
+      ],
+    );
+  }
+
+  Widget _actionButton(String action, IconData icon, String label,
+      {bool enabled = true}) {
+    final selected = _selectedAction == action;
+    return Expanded(
+      child: Opacity(
+        opacity: enabled ? 1 : 0.45,
+        child: Material(
+          color: selected ? _deepRed : Colors.white,
+          elevation: 4,
+          shadowColor: Colors.black26,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: !enabled
+                ? null
+                : () => setState(() => _selectedAction = selected ? null : action),
+            child: SizedBox(
+              height: 48,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 18, color: selected ? Colors.white : _primaryRed),
+                  const SizedBox(width: 5),
+                  Text(label,
+                      style: TextStyle(
+                        color: selected ? Colors.white : _primaryRed,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      )),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -516,7 +697,7 @@ class _AdminUsersState extends State<AdminUsers> {
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: () => _openUserDetails(user),
+        onTap: () => _handleUserTap(user),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
           child: Row(
@@ -556,21 +737,10 @@ class _AdminUsersState extends State<AdminUsers> {
               ),
               const SizedBox(width: 10),
               if (isLocked && category == 'student')
-                IconButton(
-                  onPressed: () => _unlockStudent(user),
-                  icon: const Icon(
-                    Icons.lock_open_rounded,
-                    color: Colors.green,
-                    size: 28,
-                  ),
-                  splashRadius: 22,
-                  tooltip: 'Unlock Student',
-                )
-              else
                 const Icon(
-                  Icons.chevron_right_rounded,
+                  Icons.lock_outline_rounded,
                   color: Colors.black,
-                  size: 38,
+                  size: 24,
                 ),
             ],
           ),

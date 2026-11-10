@@ -5,9 +5,6 @@ ini_set('display_errors', 1);
 
 require_once "db.php";
 
-/* =========================================
-   TOTAL ADMINS
-========================================= */
 
 $adminCountQuery = "
     SELECT COUNT(*) AS total_admins
@@ -24,9 +21,6 @@ if ($adminCountResult) {
 }
 
 
-/* =========================================
-   GET ALL ADMINS
-========================================= */
 
 $adminsQuery = "
     SELECT
@@ -68,9 +62,6 @@ if (!$admins) {
 
     <style>
 
-        /* =========================================
-           ADMIN MODAL
-        ========================================= */
 
         .modal {
             display: none;
@@ -194,16 +185,12 @@ if (!$admins) {
 
 <body>
 
-    <!-- =========================================
-         SIDEBAR
-    ========================================== -->
 
     <aside
         class="sidebar"
         id="sidebar"
     >
 
-        <!-- BRAND -->
 
         <div class="brand">
 
@@ -226,7 +213,6 @@ if (!$admins) {
         </div>
 
 
-        <!-- MANAGEMENT -->
 
         <div class="nav-title">
             User Management
@@ -280,7 +266,6 @@ if (!$admins) {
         </nav>
 
 
-        <!-- TRANSACTION RECORDS -->
 
         <div class="nav-title finance-title">
             Transaction Records
@@ -311,7 +296,6 @@ if (!$admins) {
         </nav>
 
 
-        <!-- SUPERADMIN PROFILE -->
 
         <div class="sidebar-footer">
 
@@ -340,13 +324,9 @@ if (!$admins) {
     </aside>
 
 
-    <!-- =========================================
-         MAIN CONTENT
-    ========================================== -->
 
     <main>
 
-        <!-- PAGE HEADER -->
 
         <div class="topbar">
 
@@ -365,9 +345,6 @@ if (!$admins) {
         </div>
 
 
-        <!-- =========================================
-             TOTAL ADMIN CARD
-        ========================================== -->
 
         <div class="student-summary-row">
 
@@ -403,9 +380,6 @@ if (!$admins) {
         </div>
 
 
-        <!-- =========================================
-             ADMIN TABLE
-        ========================================== -->
 
         <section class="card table-card">
 
@@ -460,7 +434,6 @@ if (!$admins) {
                             $role = $admin["role"];
 
 
-                            /* Get initials */
 
                             $words = explode(
                                 " ",
@@ -491,7 +464,6 @@ if (!$admins) {
 
                         <tr>
 
-                            <!-- ADMIN -->
 
                             <td>
 
@@ -526,7 +498,6 @@ if (!$admins) {
                             </td>
 
 
-                            <!-- ADMIN ID -->
 
                             <td>
                                 <?php
@@ -537,7 +508,6 @@ if (!$admins) {
                             </td>
 
 
-                            <!-- ROLE -->
 
                             <td>
                                 <?php
@@ -548,7 +518,6 @@ if (!$admins) {
                             </td>
 
 
-                            <!-- ACTIONS -->
 
                             <td class="action-buttons">
 
@@ -607,9 +576,6 @@ if (!$admins) {
     </main>
 
 
-    <!-- =========================================
-         ADD ADMIN MODAL
-    ========================================== -->
 
     <div
         class="modal"
@@ -639,7 +605,6 @@ if (!$admins) {
                 id="adminForm"
             >
 
-                <!-- ADMIN ID -->
 
                 <div class="form-group">
 
@@ -658,7 +623,6 @@ if (!$admins) {
                 </div>
 
 
-                <!-- FULL NAME -->
 
                 <div class="form-group">
 
@@ -677,7 +641,6 @@ if (!$admins) {
                 </div>
 
 
-                <!-- ROLE -->
 
                 <div class="form-group">
 
@@ -712,7 +675,6 @@ if (!$admins) {
                 </div>
 
 
-                <!-- PASSWORD -->
 
                 <div class="form-group">
 
@@ -731,7 +693,6 @@ if (!$admins) {
                 </div>
 
 
-                <!-- BUTTONS -->
 
                 <div class="form-actions">
 
@@ -760,15 +721,9 @@ if (!$admins) {
     </div>
 
 
-    <!-- =========================================
-         JAVASCRIPT
-    ========================================== -->
 
     <script>
 
-        /* =========================================
-           OPEN MODAL
-        ========================================== */
 
         function openAdminModal() {
 
@@ -777,9 +732,6 @@ if (!$admins) {
         }
 
 
-        /* =========================================
-           CLOSE MODAL
-        ========================================== */
 
         function closeAdminModal() {
 
@@ -790,9 +742,6 @@ if (!$admins) {
         }
 
 
-        /* =========================================
-           CLOSE WHEN CLICKING OUTSIDE
-        ========================================== */
 
         window.addEventListener("click", function(event) {
 
@@ -807,9 +756,6 @@ if (!$admins) {
         });
 
 
-        /* =========================================
-           ADD ADMIN
-        ========================================== */
 
         document.getElementById("adminForm").addEventListener(
             "submit",
@@ -878,9 +824,6 @@ if (!$admins) {
         );
 
 
-        /* =========================================
-           VIEW ADMIN
-        ========================================== */
 
         function viewAdmin(adminID) {
 
@@ -891,9 +834,6 @@ if (!$admins) {
         }
 
 
-        /* =========================================
-           DELETE ADMIN
-        ========================================== */
 
         function deleteAdmin(adminID) {
 
@@ -914,9 +854,6 @@ if (!$admins) {
         }
 
 
-        /* =========================================
-           SEARCH ADMINS
-        ========================================== */
 
         function searchAdmins(searchValue) {
 

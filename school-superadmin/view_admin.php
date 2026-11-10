@@ -6,9 +6,6 @@ ini_set('display_errors', 1);
 require_once "db.php";
 
 
-/* =========================================
-   GET ADMIN ID
-========================================= */
 
 $admin_id = trim(
     $_GET["admin_id"] ?? ""
@@ -22,9 +19,6 @@ if (empty($admin_id)) {
 }
 
 
-/* =========================================
-   GET ADMIN
-========================================= */
 
 $stmt = $conn->prepare("
     SELECT
@@ -59,9 +53,6 @@ if (!$admin) {
 }
 
 
-/* =========================================
-   GET CANTEEN NAME
-========================================= */
 
 $canteenName = "None";
 
@@ -126,9 +117,6 @@ if (!empty($admin["canteen_id"])) {
 <div class="app">
 
 
-<!-- =========================================
-     SIDEBAR
-========================================= -->
 
 <aside class="sidebar">
 
@@ -269,9 +257,6 @@ if (!empty($admin["canteen_id"])) {
 
 
 
-<!-- =========================================
-     MAIN
-========================================= -->
 
 <main style="width:100%;">
 
@@ -293,9 +278,6 @@ if (!empty($admin["canteen_id"])) {
 
 
 
-    <!-- =====================================
-         ADMIN INFORMATION
-    ====================================== -->
 
     <section class="card">
 
@@ -334,7 +316,6 @@ if (!empty($admin["canteen_id"])) {
         ?>
 
 
-        <!-- ADMIN NAME -->
 
         <div class="user-cell">
 
@@ -367,7 +348,6 @@ if (!empty($admin["canteen_id"])) {
 
 
 
-        <!-- ADMIN ID -->
 
         <p>
 
@@ -387,7 +367,6 @@ if (!empty($admin["canteen_id"])) {
 
 
 
-        <!-- FULL NAME -->
 
         <p>
 
@@ -407,7 +386,6 @@ if (!empty($admin["canteen_id"])) {
 
 
 
-        <!-- USERNAME -->
 
         <p>
 
@@ -427,7 +405,6 @@ if (!empty($admin["canteen_id"])) {
 
 
 
-        <!-- ROLE -->
 
         <p>
 
@@ -447,7 +424,6 @@ if (!empty($admin["canteen_id"])) {
 
 
 
-        <!-- CANTEEN ID -->
 
         <p>
 
@@ -475,7 +451,6 @@ if (!empty($admin["canteen_id"])) {
 
 
 
-        <!-- CANTEEN NAME -->
 
         <p>
 
@@ -495,7 +470,6 @@ if (!empty($admin["canteen_id"])) {
 
 
 
-        <!-- PASSWORD -->
 
         <p>
 
@@ -509,7 +483,6 @@ if (!empty($admin["canteen_id"])) {
 
 
 
-        <!-- PIN -->
 
         <p>
 
@@ -535,7 +508,6 @@ if (!empty($admin["canteen_id"])) {
 
 
 
-        <!-- ACCOUNT STATUS -->
 
         <p>
 
@@ -556,9 +528,6 @@ if (!empty($admin["canteen_id"])) {
 
 
 
-    <!-- =====================================
-         BACK BUTTON
-    ====================================== -->
 
     <div style="margin-top:20px;">
 

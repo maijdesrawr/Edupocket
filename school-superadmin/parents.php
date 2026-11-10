@@ -244,7 +244,6 @@ if (!$parents) {
 
             <div class="top-actions">
 
-                <!-- SEARCH -->
 
                 <input
                     type="search"
@@ -255,7 +254,6 @@ if (!$parents) {
                 >
 
 
-                <!-- NOTIFICATION -->
 
                 <button
                     class="notification"
@@ -360,7 +358,6 @@ if (!$parents) {
                                     : "—";
 
 
-                                /* GET LINKED STUDENTS */
 
                                 $linkedStudents = [];
 
@@ -375,7 +372,6 @@ if (!$parents) {
                                 }
 
 
-                                /* GET INITIALS */
 
                                 $words = explode(
                                     " ",
@@ -406,7 +402,6 @@ if (!$parents) {
 
                             <tr>
 
-                                <!-- PARENT -->
 
                                 <td>
 
@@ -447,7 +442,6 @@ if (!$parents) {
 
 
 
-                                <!-- PARENT ID -->
 
                                 <td>
 
@@ -464,7 +458,6 @@ if (!$parents) {
 
 
 
-                                <!-- EMAIL -->
 
                                 <td>
 
@@ -480,7 +473,6 @@ if (!$parents) {
 
 
 
-                                <!-- LINKED STUDENTS -->
 
                                 <td>
 
@@ -531,7 +523,6 @@ if (!$parents) {
 
 
 
-                                <!-- ACTIONS -->
 
                                 <td class="action-buttons">
 
@@ -763,7 +754,6 @@ function addLinkedStudent(select) {
     const selectedContainer =
         document.getElementById("selectedStudents");
 
-    // Prevent duplicate students
     if (document.getElementById("selected-" + studentNum)) {
         select.value = "";
         return;
@@ -812,7 +802,6 @@ function addLinkedStudent(select) {
 
     selectedContainer.appendChild(studentRow);
 
-    // Reset dropdown
     select.value = "";
 }
 
@@ -1064,7 +1053,6 @@ function removeLinkedStudent(studentNum) {
 }
 
 
-// Close modal when clicking outside it
 
 window.addEventListener(
     "click",

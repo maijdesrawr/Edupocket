@@ -6,9 +6,6 @@ ini_set('display_errors', 1);
 require_once "db.php";
 
 
-/* =========================================
-   GET PARENT ID
-========================================= */
 
 $parent_id = trim(
     $_GET["parent_id"] ?? ""
@@ -22,9 +19,6 @@ if (empty($parent_id)) {
 }
 
 
-/* =========================================
-   GET PARENT
-========================================= */
 
 $stmt = $conn->prepare("
     SELECT
@@ -58,9 +52,6 @@ if (!$parent) {
 }
 
 
-/* =========================================
-   GET LINKED STUDENTS
-========================================= */
 
 $studentStmt = $conn->prepare("
     SELECT
@@ -91,9 +82,6 @@ $studentStmt->execute();
 $students = $studentStmt->get_result();
 
 
-/* =========================================
-   PARENT INITIALS
-========================================= */
 
 $name = $parent["Fname"];
 
@@ -153,9 +141,6 @@ $initials = substr(
 <div class="app">
 
 
-    <!-- =====================================
-         SIDEBAR
-    ====================================== -->
 
     <aside class="sidebar">
 
@@ -288,16 +273,10 @@ $initials = substr(
     </aside>
 
 
-    <!-- =====================================
-         MAIN CONTENT
-    ====================================== -->
 
     <main style="width:100%;">
 
 
-        <!-- =================================
-             TOPBAR
-        ================================== -->
 
         <div class="topbar">
 
@@ -316,9 +295,6 @@ $initials = substr(
         </div>
 
 
-        <!-- =================================
-             PARENT INFORMATION
-        ================================== -->
 
         <section class="card">
 
@@ -326,7 +302,6 @@ $initials = substr(
             <div style="padding:25px;">
 
 
-                <!-- Parent Name -->
 
                 <div class="user-cell">
 
@@ -358,7 +333,6 @@ $initials = substr(
                 </div>
 
 
-                <!-- Parent ID -->
 
                 <p>
 
@@ -377,7 +351,6 @@ $initials = substr(
                 </p>
 
 
-                <!-- First Name -->
 
                 <p>
 
@@ -396,7 +369,6 @@ $initials = substr(
                 </p>
 
 
-                <!-- Middle Name -->
 
                 <p>
 
@@ -415,7 +387,6 @@ $initials = substr(
                 </p>
 
 
-                <!-- Last Name -->
 
                 <p>
 
@@ -434,7 +405,6 @@ $initials = substr(
                 </p>
 
 
-                <!-- Suffix -->
 
                 <p>
 
@@ -453,7 +423,6 @@ $initials = substr(
                 </p>
 
 
-                <!-- Email -->
 
                 <p>
 
@@ -472,7 +441,6 @@ $initials = substr(
                 </p>
 
 
-                <!-- Linked Student Count -->
 
                 <p>
 
@@ -494,9 +462,6 @@ $initials = substr(
         </section>
 
 
-        <!-- =================================
-             LINKED STUDENTS
-        ================================== -->
 
         <section
             class="card"
@@ -567,7 +532,6 @@ $initials = substr(
                     <tr>
 
 
-                        <!-- Student Number -->
 
                         <td>
 
@@ -582,7 +546,6 @@ $initials = substr(
                         </td>
 
 
-                        <!-- Student Name -->
 
                         <td>
 
@@ -597,7 +560,6 @@ $initials = substr(
                         </td>
 
 
-                        <!-- Balance -->
 
                         <td>
 
@@ -613,7 +575,6 @@ $initials = substr(
                         </td>
 
 
-                        <!-- Transaction Limit -->
 
                         <td>
 
@@ -643,7 +604,6 @@ $initials = substr(
                         </td>
 
 
-                        <!-- Account Status -->
 
                         <td>
 
@@ -726,9 +686,6 @@ $initials = substr(
         </section>
 
 
-        <!-- =================================
-             BACK BUTTON
-        ================================== -->
 
         <div style="margin-top:20px;">
 

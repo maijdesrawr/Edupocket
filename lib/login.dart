@@ -8,6 +8,7 @@ import 'audit_trail_service.dart';
 import 'cashier_dashboard_screen.dart';
 import 'change_password.dart';
 import 'login_otp_page.dart';
+import 'forgot_password_page.dart';
 import 'login_service.dart';
 import 'parent.dart';
 import 'pos_dashboard_screen.dart';
@@ -395,6 +396,31 @@ class _LoginPageState extends State<LoginPage> {
                                             setState(() => _error = null);
                                           }
                                         },
+                                      ),
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: TextButton(
+                                          key: const Key('forgot-password-button'),
+                                          onPressed: _isLoading
+                                              ? null
+                                              : () => Navigator.of(context).push(
+                                                    MaterialPageRoute<void>(
+                                                      builder: (_) =>
+                                                          const ForgotPasswordPage(),
+                                                    ),
+                                                  ),
+                                          style: TextButton.styleFrom(
+                                            foregroundColor:
+                                                const Color(0xFFE53935),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 4,
+                                              vertical: 2,
+                                            ),
+                                            tapTargetSize:
+                                                MaterialTapTargetSize.shrinkWrap,
+                                          ),
+                                          child: const Text('Forgot Password?'),
+                                        ),
                                       ),
                                       AnimatedSwitcher(
                                         duration:

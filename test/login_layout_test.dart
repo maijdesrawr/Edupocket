@@ -17,9 +17,6 @@ void main() {
     );
     expect(tester.takeException(), isNull);
 
-    // Model the transient near-full-height inset observed while Android opens
-    // the keyboard. The usable layout height can briefly fall below the form's
-    // decorative header offset.
     tester.view.viewInsets = const FakeViewPadding(bottom: 1500);
     await tester.pump();
 

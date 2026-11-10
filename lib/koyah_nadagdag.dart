@@ -299,6 +299,12 @@ class _AddUserState extends State<AddUser> {
           SnackBar(content: Text(error.message)),
         );
       }
+    } on FormatException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid QR scanned.')),
+        );
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -431,6 +437,9 @@ class _AddUserState extends State<AddUser> {
     final isStudentField = label.startsWith('student_');
     final isLoadedParentField =
         widget.category == 'student' && label.startsWith('parent_');
+    final isQrPopulatedField =
+        (widget.category == 'student' || widget.category == 'child') &&
+            (isStudentField || isLoadedParentField);
 
     bool isNumericOnly = label == 'student_num' ||
         label == 'parent_id' ||
@@ -438,7 +447,9 @@ class _AddUserState extends State<AddUser> {
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
-      child: TextFormField(
+      child: AbsorbPointer(
+        absorbing: isQrPopulatedField,
+        child: TextFormField(
         controller: controllers[label],
         enabled: !isLoadedParentField,
         readOnly: isStudentField || isLoadedParentField,
@@ -483,6 +494,7 @@ class _AddUserState extends State<AddUser> {
             borderSide: const BorderSide(color: Color(0xFFB90000), width: 1.5),
           ),
         ),
+        ),
       ),
     );
   }
@@ -517,7 +529,8 @@ class _AddUserState extends State<AddUser> {
         ),
         icon: const Icon(
           Icons.arrow_drop_down,
-          color: Colors.white,
+          color: Colors.black,
+          size: 32,
         ),
         style: const TextStyle(color: Color(0xFFC51F26)),
         items: parents.map((parent) {

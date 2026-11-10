@@ -138,7 +138,6 @@ void main() {
     await tester.pump();
     harness.requestedPaths.clear();
 
-    // Time passing on its own must not keep the backend session alive.
     await tester.pump(const Duration(minutes: 2));
     expect(
       harness.requestedPaths

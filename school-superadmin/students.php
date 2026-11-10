@@ -270,7 +270,6 @@ if ($parentSearchResult) {
         }
 
 
-/* Student credentials success modal - hidden until student is created */
 .credentials-modal {
     display: none;
     position: fixed;
@@ -373,7 +372,6 @@ if ($parentSearchResult) {
 }
 
 
-/* Lock / unlock confirmation modal */
 .lock-confirm-modal {
     display: none;
     position: fixed;
@@ -522,7 +520,6 @@ if ($parentSearchResult) {
 
     <main>
 
-        <!-- PAGE HEADER -->
 
         <div class="topbar">
 
@@ -558,7 +555,6 @@ if ($parentSearchResult) {
 
         </div>
 
-        <!-- SUMMARY -->
 
         <div class="student-summary-row">
 
@@ -600,7 +596,6 @@ if ($parentSearchResult) {
 
         </div>
 
-        <!-- STUDENT TABLE -->
 
         <section class="card table-card">
 
@@ -671,7 +666,6 @@ if ($parentSearchResult) {
                                 (int)$student["is_locked"];
 
 
-                            /* GET INITIALS */
 
                             $words = explode(
                                 " ",
@@ -711,7 +705,6 @@ if ($parentSearchResult) {
 
                         <tr>
 
-                            <!-- STUDENT -->
 
                             <td>
 
@@ -755,7 +748,6 @@ if ($parentSearchResult) {
                                     ?>
                                 </td>
 
-                            <!-- ACCOUNT STATUS -->
 
                             <td>
 
@@ -788,7 +780,6 @@ if ($parentSearchResult) {
                             </td>
 
 
-                            <!-- BALANCE -->
 
                             <td>
 
@@ -804,7 +795,6 @@ if ($parentSearchResult) {
                             </td>
 
 
-                            <!-- ACTIONS -->
 
                             <td>
 
@@ -884,7 +874,6 @@ if ($parentSearchResult) {
 
         </section>
 
-        <!-- NEW STUDENT MODAL -->
 
         <div
             id="studentModal"
@@ -922,7 +911,6 @@ if ($parentSearchResult) {
                         value="student"
                     >
 
-                    <!-- PARENT / GUARDIAN -->
 
                     <div class="form-section">
 
@@ -969,7 +957,6 @@ if ($parentSearchResult) {
 
                     </div>
 
-                    <!-- STUDENT INFORMATION -->
 
                     <div class="form-section">
 
@@ -1064,7 +1051,6 @@ if ($parentSearchResult) {
 
                     </div>
 
-                    <!-- NEW PARENT -->
 
                     <div
                         id="newParentSection"
@@ -1147,7 +1133,6 @@ if ($parentSearchResult) {
 
                     </div>
 
-                    <!-- EXISTING PARENT -->
 
                     <div
                         id="existingParentSection"
@@ -1236,7 +1221,6 @@ if ($parentSearchResult) {
                     </div>
 
 
-                    <!-- MODAL BUTTONS -->
 
                     <div class="modal-actions">
 
@@ -1934,7 +1918,6 @@ function confirmLockAction() {
         confirmButton.textContent = "Please wait...";
     }
 
-    // The existing endpoint performs the lock/unlock operation.
     window.location.href =
         "lock_student.php?student_num=" +
         encodeURIComponent(pendingLockStudentNumber);

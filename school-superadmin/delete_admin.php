@@ -5,9 +5,6 @@ ini_set('display_errors', 1);
 
 require_once "db.php";
 
-/* =========================================
-   GET ADMIN ID
-========================================= */
 
 $adminID = trim($_GET["admin_id"] ?? "");
 
@@ -16,9 +13,6 @@ if ($adminID === "") {
 }
 
 
-/* =========================================
-   CHECK IF ADMIN EXISTS
-========================================= */
 
 $checkAdmin = $conn->prepare("
     SELECT admin_id, Fname, role
@@ -53,9 +47,6 @@ $admin = $result->fetch_assoc();
 $checkAdmin->close();
 
 
-/* =========================================
-   DELETE ADMIN
-========================================= */
 
 $deleteAdmin = $conn->prepare("
     DELETE FROM admins
@@ -82,9 +73,6 @@ if ($deleteAdmin->execute()) {
 }
 
 
-/* =========================================
-   DELETE FAILED
-========================================= */
 
 $error = $deleteAdmin->error;
 

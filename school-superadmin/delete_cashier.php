@@ -6,9 +6,6 @@ ini_set('display_errors', 1);
 require_once "db.php";
 
 
-/* =========================================
-   GET CASHIER ID
-========================================= */
 
 $cashierID = trim(
     $_GET["cashier_id"] ?? ""
@@ -21,9 +18,6 @@ if ($cashierID === "") {
 }
 
 
-/* =========================================
-   CHECK CASHIER EXISTS
-========================================= */
 
 $stmt = $conn->prepare("
     SELECT cashier_id
@@ -60,9 +54,6 @@ if ($result->num_rows === 0) {
 $stmt->close();
 
 
-/* =========================================
-   DELETE CASHIER
-========================================= */
 
 $stmt = $conn->prepare("
     DELETE FROM cashiers
@@ -98,9 +89,6 @@ $stmt->close();
 $conn->close();
 
 
-/* =========================================
-   RETURN TO POS PAGE
-========================================= */
 
 header(
     "Location: pos_cashiers.php?deleted=1"

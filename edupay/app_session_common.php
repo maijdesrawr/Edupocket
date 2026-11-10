@@ -94,6 +94,46 @@ function as_reject_session(string $code, string $message): void
     pc_reject($message, ['code' => $code]);
 }
 
+function as_assert_account_unlocked(
+    mysqli $conn,
+    string $role,
+    string $accountSource,
+    string $userId
+): void {
+    $isLocked = false;
+    if ($role === 'student'
+        && pc_table_exists($conn, 'students')
+        && pc_column_exists($conn, 'students', 'is_locked')
+    ) {
+        $statement = pc_prepare(
+            $conn,
+            'SELECT is_locked FROM students WHERE student_num = ? LIMIT 1'
+        );
+        $statement->bind_param('s', $userId);
+        $statement->execute();
+        $row = $statement->get_result()->fetch_assoc();
+        $statement->close();
+        $isLocked = (int)($row['is_locked'] ?? 0) === 1;
+    } elseif (pc_table_exists($conn, 'admin_account_locks')) {
+        $statement = pc_prepare(
+            $conn,
+            'SELECT is_locked FROM admin_account_locks '
+                . 'WHERE role = ? AND account_source = ? AND user_id = ? LIMIT 1'
+        );
+        $statement->bind_param('sss', $role, $accountSource, $userId);
+        $statement->execute();
+        $row = $statement->get_result()->fetch_assoc();
+        $statement->close();
+        $isLocked = (int)($row['is_locked'] ?? 0) === 1;
+    }
+
+    if ($isLocked) {
+        pc_reject('Your account is locked. Contact an administrator.', [
+            'code' => 'account_locked',
+        ]);
+    }
+}
+
 function as_assert_session_identity(
     array $session,
     string $role,
@@ -628,6 +668,7 @@ function as_require_session(mysqli $conn, bool $touch = true): array
         as_mark_session_revoked($conn, $row, 'account_changed', $config);
         as_reject_session('session_invalid', 'Your account security changed. Please log in again.');
     }
+    as_assert_account_unlocked($conn, $role, $accountSource, $userId);
 
     $claim = pc_prepare(
         $conn,

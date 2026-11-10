@@ -85,9 +85,6 @@ try {
     );
 }
 
-/*
- * Get the latest notification ID for this account.
- */
 $latestStatement = $conn->prepare(
     "SELECT COALESCE(MAX(notification_id), 0) AS latest_id
      FROM account_notifications
@@ -120,11 +117,6 @@ $latestId = (int)($latestRow['latest_id'] ?? 0);
 
 $latestStatement->close();
 
-/*
- * First activation:
- * Do not show old notifications.
- * Just establish the current notification cursor.
- */
 if ($afterId === 0) {
     notification_json([
         'status' => 'success',
@@ -133,9 +125,6 @@ if ($afterId === 0) {
     ]);
 }
 
-/*
- * Get newly-created notifications.
- */
 $statement = $conn->prepare(
     "SELECT
         notification_id,

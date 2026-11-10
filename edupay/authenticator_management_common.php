@@ -83,7 +83,6 @@ function am_purge_stale_security_state(mysqli $conn): void
     }
 }
 
-/** @param array<string, mixed> $config */
 function am_rate_scope_hash(string $scopeValue, array $config): string
 {
     return hash_hmac(
@@ -93,7 +92,6 @@ function am_rate_scope_hash(string $scopeValue, array $config): string
     );
 }
 
-/** @param array<string, mixed> $config */
 function am_remote_ip_hash(array $config): string
 {
     $address = trim((string)($_SERVER['REMOTE_ADDR'] ?? ''));
@@ -186,10 +184,6 @@ function am_consume_rate_limit(
     return 0;
 }
 
-/**
- * @param array<string, mixed> $config
- * @return array{account_retry_after:int,ip_retry_after:int,ip_hash:string}
- */
 function am_consume_pre_auth_attempt(
     mysqli $conn,
     string $role,
@@ -221,10 +215,6 @@ function am_consume_pre_auth_attempt(
     ];
 }
 
-/**
- * @param array<string, mixed> $config
- * @return array{retry_after:int,ip_hash:string}
- */
 function am_consume_verify_ip_attempt(mysqli $conn, array $config): array
 {
     $ipHash = am_remote_ip_hash($config);
@@ -240,7 +230,6 @@ function am_consume_verify_ip_attempt(mysqli $conn, array $config): array
     ];
 }
 
-/** @param array<string, mixed> $config */
 function am_consume_verify_account_attempt(
     mysqli $conn,
     string $role,
@@ -261,7 +250,6 @@ function am_consume_verify_account_attempt(
     );
 }
 
-/** @return array{password_value:string,account_source:string,user_id:string} */
 function am_authenticate_account_for_management(
     mysqli $conn,
     string $role,
@@ -291,7 +279,6 @@ function am_authenticate_account_for_management(
     return $account;
 }
 
-/** @return array<string, mixed>|null */
 function am_authenticator_for_update(
     mysqli $conn,
     string $role,
@@ -315,7 +302,6 @@ function am_authenticator_for_update(
     return is_array($row) ? $row : null;
 }
 
-/** @param array<string, mixed> $config */
 function am_authenticator_fingerprint(
     string $role,
     string $accountSource,
@@ -338,7 +324,6 @@ function am_challenge_token_hash(string $token): string
     return hash('sha256', $token);
 }
 
-/** @return array<string, mixed>|null */
 function am_challenge_preview(mysqli $conn, string $tokenHash): ?array
 {
     $statement = pc_prepare(
@@ -357,7 +342,6 @@ function am_challenge_preview(mysqli $conn, string $tokenHash): ?array
     return is_array($row) ? $row : null;
 }
 
-/** @return array<string, mixed>|null */
 function am_challenge_for_update(mysqli $conn, string $tokenHash): ?array
 {
     $statement = pc_prepare(
@@ -376,7 +360,6 @@ function am_challenge_for_update(mysqli $conn, string $tokenHash): ?array
     return is_array($row) ? $row : null;
 }
 
-/** @param array<string, mixed> $challenge */
 function am_assert_pending_challenge(array $challenge): void
 {
     if (($challenge['status'] ?? '') !== 'pending') {

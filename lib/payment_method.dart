@@ -257,9 +257,6 @@ class _PaymentMethodPageState extends State<PaymentMethodPage>
     }
   }
 
-  // ------------------------------------------------------------
-  // PAYMENT METHOD CARD UI
-  // ------------------------------------------------------------
 
   Widget _paymentMethodCard({
     required IconData icon,
@@ -343,9 +340,6 @@ class _PaymentMethodPageState extends State<PaymentMethodPage>
     );
   }
 
-  // ------------------------------------------------------------
-  // UI
-  // ------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -378,9 +372,6 @@ class _PaymentMethodPageState extends State<PaymentMethodPage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --------------------------------------------------
-              // AMOUNT CARD
-              // --------------------------------------------------
 
               Container(
                 width: double.infinity,
@@ -426,9 +417,6 @@ class _PaymentMethodPageState extends State<PaymentMethodPage>
 
               const SizedBox(height: 28),
 
-              // --------------------------------------------------
-              // SECTION TITLE
-              // --------------------------------------------------
 
               const Text(
                 'Choose Payment Method',
@@ -450,9 +438,6 @@ class _PaymentMethodPageState extends State<PaymentMethodPage>
 
               const SizedBox(height: 18),
 
-              // --------------------------------------------------
-              // LOADING
-              // --------------------------------------------------
 
               if (_busy)
                 const Padding(
@@ -464,13 +449,7 @@ class _PaymentMethodPageState extends State<PaymentMethodPage>
                   ),
                 ),
 
-              // --------------------------------------------------
-              // BANK TRANSFER
-              // --------------------------------------------------
 
-              // --------------------------------------------------
-              // GCASH
-              // --------------------------------------------------
 
               _paymentMethodCard(
                 icon: Icons.phone_android_rounded,
@@ -483,9 +462,6 @@ class _PaymentMethodPageState extends State<PaymentMethodPage>
 
               const SizedBox(height: 14),
 
-              // --------------------------------------------------
-              // MAYA
-              // --------------------------------------------------
 
               _paymentMethodCard(
                 icon: Icons.account_balance_wallet_rounded,
@@ -496,9 +472,6 @@ class _PaymentMethodPageState extends State<PaymentMethodPage>
                 onTap: () => _startPayMongo(context, 'Maya'),
               ),
 
-              // --------------------------------------------------
-              // QR PH
-              // --------------------------------------------------
               const SizedBox(height: 14),
 
               _paymentMethodCard(
@@ -510,9 +483,6 @@ class _PaymentMethodPageState extends State<PaymentMethodPage>
                 onTap: () => _startPayMongo(context, 'QR Ph'),
               ),
 
-              // --------------------------------------------------
-              // CHECKOUT STATUS
-              // --------------------------------------------------
 
               if (_checkoutId != null) ...[
                 const SizedBox(height: 24),

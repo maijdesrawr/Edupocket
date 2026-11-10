@@ -105,9 +105,6 @@ $topupsResult = $stmt->get_result();
 <div class="app">
 
 
-    <!-- =========================
-         SIDEBAR
-    ========================== -->
 
     <aside class="sidebar">
 
@@ -378,9 +375,6 @@ $topupsResult = $stmt->get_result();
 
         <section class="card table-card">
 
-            <!-- =========================
-                 TABLE
-            ========================== -->
 
             <div class="table-wrapper">
 
@@ -442,7 +436,6 @@ $topupsResult = $stmt->get_result();
                             <tr>
 
 
-                                <!-- TOP-UP ID -->
 
                                 <td>
 
@@ -458,7 +451,6 @@ $topupsResult = $stmt->get_result();
 
 
 
-                                <!-- PARENT ID -->
 
                                 <td>
 
@@ -475,7 +467,6 @@ $topupsResult = $stmt->get_result();
 
 
 
-                                <!-- STUDENT ID -->
 
                                 <td>
 
@@ -501,7 +492,6 @@ $topupsResult = $stmt->get_result();
 
 
 
-                                <!-- AMOUNT -->
 
                                 <td>
 
@@ -519,7 +509,6 @@ $topupsResult = $stmt->get_result();
 
 
 
-                                <!-- METHOD -->
 
                                 <td>
 
@@ -535,7 +524,6 @@ $topupsResult = $stmt->get_result();
 
 
 
-                                <!-- STATUS -->
 
                                 <td>
 
@@ -551,7 +539,6 @@ $topupsResult = $stmt->get_result();
 
 
 
-                                <!-- DATE & TIME -->
 
                                 <td>
 

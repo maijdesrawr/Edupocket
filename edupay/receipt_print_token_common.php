@@ -102,7 +102,6 @@ function rpt_assert_receipt_account_source(
     }
 }
 
-/** @return array<string, mixed> */
 function rpt_fetch_receipt_for_identity(
     mysqli $conn,
     int $transactionId,
@@ -245,7 +244,6 @@ function rpt_insert_authorized_token(
     throw new RuntimeException('The printable receipt link could not be created.');
 }
 
-/** @return array{print_token:string,expires_in:int} */
 function rpt_issue_for_authenticated_request(mysqli $conn, int $transactionId): array
 {
     $session = as_require_session($conn);
@@ -293,7 +291,6 @@ function rpt_issue_for_authenticated_request(mysqli $conn, int $transactionId): 
     }
 }
 
-/** @return array{print_token:string,expires_in:int} */
 function rpt_issue_for_verified_parent_callback(
     mysqli $conn,
     int $transactionId,
@@ -341,7 +338,6 @@ function rpt_issue_for_verified_parent_callback(
     }
 }
 
-/** @return array<string, mixed> */
 function rpt_consume_print_token(mysqli $conn, string $token): array
 {
     rpt_assert_schema($conn);

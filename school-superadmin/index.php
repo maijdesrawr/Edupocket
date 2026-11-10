@@ -16,7 +16,6 @@ if ($adminCountResult) {
     $totalAdmins = $row["total_admins"];
 }
 
-/*TOTAL STUDENTS*/
 
 $studentsQuery = "
     SELECT COUNT(*) AS total_students
@@ -29,7 +28,6 @@ $studentData = $studentsResult->fetch_assoc();
 
 $totalStudents = $studentData["total_students"];
 
-/*TOTAL PARENTS*/
 
 $parentsQuery = "
     SELECT COUNT(*) AS total_parents
@@ -42,7 +40,6 @@ $parentData = $parentsResult->fetch_assoc();
 
 $totalParents = $parentData["total_parents"];
 
-/*TOTAL CASHIERS*/
 
 $cashiersQuery = "
     SELECT
@@ -56,7 +53,6 @@ $cashierData = $cashiersResult->fetch_assoc();
 $totalCashiers = $cashierData["total_cashiers"];
 
 
-/*TOTAL TRANSACTION AMOUNT*/
 
 $totalTransactionAmountQuery = "
     SELECT COALESCE(SUM(amount), 0) AS total_transaction_amount
@@ -75,7 +71,6 @@ $totalTransactionAmount =
     $totalTransactionAmountData["total_transaction_amount"];
 
 
-/*RECENT TRANSACTIONS*/
 
 $recentTransactionsQuery = "
     SELECT
@@ -97,7 +92,6 @@ $recentTransactions = $conn->query(
 );
 
 
-/*RECENT STUDENTS*/
 
 $recentStudentsQuery = "
     SELECT
@@ -114,7 +108,6 @@ $recentStudents = $conn->query(
 );
 
 
-/*RECENT PARENTS*/
 
 $recentParentsQuery = "
     SELECT
@@ -158,12 +151,10 @@ $recentParents = $conn->query(
 
 <div class="app">
 
-    <!-- SIDEBAR -->
     <aside
         class="sidebar"
         id="sidebar"
          >
-        <!-- BRAND -->
 
         <div class="brand">
 
@@ -185,7 +176,6 @@ $recentParents = $conn->query(
 
         </div>
 
-        <!-- MANAGEMENT -->
 
         <div class="nav-title">
             User Management
@@ -229,7 +219,6 @@ $recentParents = $conn->query(
 
         </nav>
 
-        <!--FINANCE AND SYSTEM-->
 
         <div class="nav-title finance-title">
 
@@ -258,7 +247,6 @@ $recentParents = $conn->query(
             </button>
         </nav>
 
-        <!--SUPERADMIN PROFILE-->
 
         <div class="sidebar-footer">
             <div class="admin-card">
@@ -281,16 +269,13 @@ $recentParents = $conn->query(
 
     </aside>
 
-    <!--MAIN CONTENT-->
 
     <main>
 
-        <!--TOP BAR-->
 
         <div class="topbar">
             <div class="topbar-left">
 
-                <!-- MOBILE MENU -->
 
                 <button
                     class="mobile-menu"
@@ -317,11 +302,9 @@ $recentParents = $conn->query(
 
 
 
-        <!--STATISTICS-->
 
         <div class="total-cards">
 
-        <!-- TOTAL STUDENTS -->
 
             <div class="total-card">
 
@@ -345,7 +328,6 @@ $recentParents = $conn->query(
 
             </div>
 
-            <!-- TOTAL PARENTS -->
 
             <div class="total-card">
 
@@ -369,7 +351,6 @@ $recentParents = $conn->query(
 
             </div>
 
-            <!-- TOTAL CASHIERS -->
 
             <div class="total-card">
 
@@ -416,7 +397,6 @@ $recentParents = $conn->query(
             </div>
 
 
-            <!-- TOTAL BALANCE -->
 
             <div class="total-card">
 
@@ -443,7 +423,6 @@ $recentParents = $conn->query(
         </div>
 
 
-        <!--RECENT TRANSACTIONS-->
 
         <section class="card recent-activity-card">
             <div class="card-header">
@@ -539,10 +518,8 @@ $recentParents = $conn->query(
             </div>
         </section>
 
-        <!--MANAGE BUTTONS-->
         <section class="quick-actions">
             
-        <!-- STUDENTS -->
             <div
                 class="quick-action"
                 onclick="window.location.href='students.php'"
@@ -555,7 +532,6 @@ $recentParents = $conn->query(
                 </p>
             </div>
 
-            <!-- PARENTS -->
             <div
                 class="quick-action"
                 onclick="window.location.href='parents.php'"
@@ -568,7 +544,6 @@ $recentParents = $conn->query(
                 </p>
             </div>
 
-            <!-- CASHIERS -->
             <div
                 class="quick-action"
                 onclick="window.location.href='pos_cashiers.php'"
@@ -582,7 +557,6 @@ $recentParents = $conn->query(
             </div>
         </section>
 
-        <!--RECENTLY REGISTERED ACCOUNTS-->
 
         <section class="card table-card">
 
@@ -627,7 +601,6 @@ $recentParents = $conn->query(
                                 $balance =
                                     $student["balance"];
 
-                                /* GET INITIALS */
                                 $words =
                                     explode(
                                         " ",
@@ -717,7 +690,6 @@ $recentParents = $conn->query(
     </main>
 </div>
 
-<!--JAVASCRIPT CONNECTION-->
 
 <script src="script.js"></script>
 </body>

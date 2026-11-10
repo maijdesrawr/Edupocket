@@ -89,7 +89,6 @@ if (!ensure_profile_photo_column($conn, $table)) {
     ]);
 }
 
-// Ensure user exists and fetch current photo for cleanup.
 $lookupSql = "SELECT `$idField` AS id, `$nameField` AS name, profile_photo "
     . "FROM `$table` WHERE `$idField` = ? LIMIT 1";
 $lookupStmt = $conn->prepare($lookupSql);

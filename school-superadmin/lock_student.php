@@ -25,9 +25,6 @@ if (empty($student_num)) {
 }
 
 
-/* =========================================
-   GET CURRENT FREEZE STATUS
-========================================= */
 
 $stmt = $conn->prepare("
     SELECT is_locked
@@ -54,9 +51,6 @@ if (!$student) {
 }
 
 
-/* =========================================
-   TOGGLE FREEZE
-========================================= */
 
 $newStatus =
     $student["is_locked"] ? 0 : 1;

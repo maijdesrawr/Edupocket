@@ -518,3 +518,261 @@ class UserDetails extends StatelessWidget {
     );
   }
 }
+
+class UserEditPage extends StatefulWidget {
+  final Map<String, dynamic> user;
+  final String category;
+
+  const UserEditPage({
+    super.key,
+    required this.user,
+    required this.category,
+  });
+
+  @override
+  State<UserEditPage> createState() => _UserEditPageState();
+}
+
+class _UserEditPageState extends State<UserEditPage> {
+  static const _red = Color(0xFFC51F26);
+  late final TextEditingController _name;
+  late final TextEditingController _linked;
+  late final TextEditingController _location;
+  late final TextEditingController _username;
+  late final TextEditingController _canteenId;
+  late final TextEditingController _idController;
+  late final TextEditingController _balanceController;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = widget.user;
+    _name = TextEditingController(text: (user['name'] ?? '').toString());
+    _linked = TextEditingController(
+      text: widget.category == 'student'
+          ? (user['parent_id'] ?? '').toString()
+          : (user['student_nums'] ?? user['student_num'] ?? '').toString(),
+    );
+    _location = TextEditingController(text: (user['location'] ?? '').toString());
+    _username = TextEditingController(text: (user['username'] ?? '').toString());
+    _canteenId = TextEditingController(text: (user['canteen_id'] ?? '').toString());
+    _idController = TextEditingController(text: _idField);
+    _balanceController = TextEditingController(
+      text: '\u20B1${double.tryParse(user['balance']?.toString() ?? '')?.toStringAsFixed(2) ?? '0.00'}',
+    );
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _linked.dispose();
+    _location.dispose();
+    _username.dispose();
+    _canteenId.dispose();
+    _idController.dispose();
+    _balanceController.dispose();
+    super.dispose();
+  }
+
+  String get _idField => switch (widget.category) {
+        'student' => (widget.user['student_num'] ?? '').toString(),
+        'parent' => (widget.user['parent_id'] ?? '').toString(),
+        'pos' => (widget.user['canteen_id'] ?? '').toString(),
+        _ => (widget.user['cashier_id'] ?? '').toString(),
+      };
+
+  String get _idLabel => switch (widget.category) {
+        'student' => 'Student Number',
+        'parent' => 'Parent ID',
+        'pos' => 'Canteen ID',
+        _ => 'Cashier ID',
+      };
+
+  Future<void> _save() async {
+    FocusScope.of(context).unfocus();
+    if (_name.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Name is required.')),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Save changes?'),
+        content: Text('Save the updated details for ${_name.text.trim()}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _red),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _saving = true);
+    try {
+      final body = <String, String>{
+        'category': widget.category,
+        'id': _idField,
+        'Fname': _name.text.trim(),
+        'location': _location.text.trim(),
+        'username': widget.category == 'cashier' ? _username.text.trim() : '',
+        'canteen_id': widget.category == 'cashier' ? _canteenId.text.trim() : '',
+      };
+      if (widget.category == 'student' || widget.category == 'parent') {
+        body['linked_id'] = _linked.text.trim();
+      }
+      final response = await http.post(
+        Uri.parse(ApiConfig.url('koyah_nabago.php')),
+        headers: AppSessionService.instance.authorizationHeaders,
+        body: body,
+      );
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (!mounted) return;
+      if (response.statusCode != 200 || data['status'] != 'success') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text((data['message'] ?? 'Could not save changes.').toString())),
+        );
+        return;
+      }
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          icon: const Icon(Icons.check_circle, color: Color(0xFF299B0A), size: 42),
+          title: const Text('Changes saved'),
+          content: const Text('The user details have been updated.'),
+          actions: [
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: _red),
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save changes. Please try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Widget _editCard(String label, TextEditingController controller,
+      {bool enabled = true, String? hint}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFF9E1B21),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white54, width: 1.5),
+      ),
+      child: TextField(
+        controller: controller,
+        readOnly: !enabled,
+        style: const TextStyle(color: Colors.white, fontSize: 16),
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          labelStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+          hintStyle: const TextStyle(color: Colors.white70),
+          border: InputBorder.none,
+          prefixIcon: Icon(
+            enabled ? Icons.edit_outlined : Icons.badge_outlined,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fields = <Widget>[
+      _editCard('Name', _name),
+      _editCard(_idLabel, _idController, enabled: false),
+    ];
+    if (widget.category == 'student') {
+      fields
+        ..add(_editCard('Linked Parent ID', _linked, hint: 'None'))
+        ..add(_editCard('Balance', _balanceController, enabled: false));
+    } else if (widget.category == 'parent') {
+      fields.add(_editCard('Linked Student IDs', _linked, hint: 'None'));
+    } else if (widget.category == 'pos') {
+      fields.add(_editCard('Location', _location, hint: 'Not set'));
+    } else {
+      fields
+        ..add(_editCard('Username', _username))
+        ..add(_editCard('Canteen ID', _canteenId));
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F8F8),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back, color: _red),
+                  ),
+                  Image.asset('assets/redlogo.png', height: 38),
+                  const SizedBox(width: 12),
+                  const Text('Edit User', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  color: _red,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+                ),
+                padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+                child: ListView(children: fields),
+              ),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          color: _red,
+          padding: const EdgeInsets.fromLTRB(24, 10, 24, 20),
+          child: SizedBox(
+            height: 54,
+            child: ElevatedButton(
+              onPressed: _saving ? null : _save,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: _red,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: _saving
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Save', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

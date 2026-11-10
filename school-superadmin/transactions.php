@@ -2,18 +2,12 @@
 
 require_once "db.php";
 
-/* =========================
-   FILTER VALUES
-========================= */
 
 $studentId = trim($_GET['student_id'] ?? '');
 $cashierId = trim($_GET['cashier_id'] ?? '');
 $canteenId = trim($_GET['canteen_id'] ?? '');
 $date = trim($_GET['date'] ?? '');
 
-/* =========================
-   CHECK IF STUDENT EXISTS
-========================= */
 
 $studentExists = true;
 
@@ -38,9 +32,6 @@ if ($studentId !== '') {
     $checkStudentStmt->close();
 }
 
-/* =========================
-   TOTAL TRANSACTIONS
-========================= */
 
 $totalTransactionsQuery = "
     SELECT COUNT(*) AS total_transactions
@@ -53,9 +44,6 @@ $totalTransactionsData = $totalTransactionsResult->fetch_assoc();
 $totalTransactions = $totalTransactionsData['total_transactions'];
 
 
-/* =========================
-   TRANSACTION QUERY
-========================= */
 
 $transactionsQuery = "
     SELECT
@@ -75,7 +63,6 @@ $params = [];
 $types = "";
 
 
-/* Student ID filter */
 
 if ($studentId !== '') {
 
@@ -88,7 +75,6 @@ if ($studentId !== '') {
 }
 
 
-/* Cashier ID filter */
 
 if ($cashierId !== '') {
 
@@ -111,7 +97,6 @@ if ($canteenId !== '') {
 }
 
 
-/* Date filter */
 
 if ($date !== '') {
 
@@ -124,7 +109,6 @@ if ($date !== '') {
 }
 
 
-/* Newest transactions first */
 
 $transactionsQuery .= "
     ORDER BY date_time DESC
@@ -290,14 +274,10 @@ $transactionsResult = $stmt->get_result();
 
 
 
-    <!-- =========================
-         MAIN CONTENT
-    ========================== -->
 
     <main style="width:100%;">
 
 
-        <!-- TOPBAR -->
 
         <div class="topbar">
 
@@ -317,13 +297,7 @@ $transactionsResult = $stmt->get_result();
 
 
 
-        <!-- =========================
-             SUMMARY
-        ========================== -->
 
-            <!-- =========================
-                 FILTERS
-            ========================== -->
 
             <div
                 style="
@@ -342,7 +316,6 @@ $transactionsResult = $stmt->get_result();
                 >
 
 
-                    <!-- STUDENT ID -->
 
                     <div
                         class="form-group"
@@ -368,7 +341,6 @@ $transactionsResult = $stmt->get_result();
 
 
 
-                    <!-- CANTEEN ID -->
 
                     <div
                         class="form-group"
@@ -417,7 +389,6 @@ $transactionsResult = $stmt->get_result();
 
 
 
-                    <!-- DATE -->
 
                     <div
                         class="form-group"
@@ -442,7 +413,6 @@ $transactionsResult = $stmt->get_result();
 
 
 
-                    <!-- FILTER BUTTON -->
 
                     <button
                         type="submit"
@@ -453,7 +423,6 @@ $transactionsResult = $stmt->get_result();
 
 
 
-                    <!-- CLEAR BUTTON -->
 
                     <a
                         href="transactions.php"
@@ -477,15 +446,9 @@ $transactionsResult = $stmt->get_result();
 
 
 
-        <!-- =========================
-             TRANSACTION CARD
-        ========================== -->
 
         <section class="card table-card">
 
-            <!-- =========================
-                 TABLE
-            ========================== -->
 
             <div class="table-wrapper">
 
@@ -547,7 +510,6 @@ $transactionsResult = $stmt->get_result();
                             <tr>
 
 
-                                <!-- TRANSACTION ID -->
 
                                 <td>
 
@@ -561,7 +523,6 @@ $transactionsResult = $stmt->get_result();
 
 
 
-                                <!-- STUDENT ID -->
 
                                 <td>
 
@@ -575,7 +536,6 @@ $transactionsResult = $stmt->get_result();
 
 
 
-                                <!-- CASHIER ID -->
 
                                 <td>
 
@@ -605,7 +565,6 @@ $transactionsResult = $stmt->get_result();
 
 
 
-                                <!-- TYPE -->
 
                                 <td>
 
@@ -619,7 +578,6 @@ $transactionsResult = $stmt->get_result();
 
 
 
-                                <!-- DESCRIPTION -->
 
                                 <td>
 
@@ -636,7 +594,6 @@ $transactionsResult = $stmt->get_result();
 
 
 
-                                <!-- AMOUNT -->
 
                                 <td>
 
@@ -654,7 +611,6 @@ $transactionsResult = $stmt->get_result();
 
 
 
-                                <!-- DATE -->
 
                                 <td>
 

@@ -49,6 +49,7 @@ try {
     $role = pc_normalize_role((string)$account['app_role']);
     $accountSource = (string)$account['account_source'];
     $userId = (string)$account['id'];
+    as_assert_account_unlocked($conn, $role, $accountSource, $userId);
     $methods = lo_available_methods($conn, $role, $accountSource, $userId);
 
     if ($methods === []) {

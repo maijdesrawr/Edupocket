@@ -18,7 +18,6 @@ try {
 
     $conn->begin_transaction();
 
-    // Get the student's parent ID
     $stmt = $conn->prepare("
         SELECT parent_id
         FROM students
@@ -43,7 +42,6 @@ try {
     $stmt->close();
 
 
-    // Delete parent-student link
     $stmt = $conn->prepare("
         DELETE FROM parent_student_link
         WHERE student_num = ?
@@ -53,7 +51,6 @@ try {
     $stmt->close();
 
 
-    // Delete student
     $stmt = $conn->prepare("
         DELETE FROM students
         WHERE student_num = ?
@@ -63,7 +60,6 @@ try {
     $stmt->close();
 
 
-    // If the parent has no remaining students, delete the parent account
     if (!empty($parentID)) {
 
         $stmt = $conn->prepare("
@@ -100,7 +96,6 @@ try {
 
     $conn->commit();
 
-    // Simply return to the students page
     header("Location: students.php");
     exit;
 

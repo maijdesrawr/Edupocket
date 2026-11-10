@@ -6,9 +6,6 @@ ini_set('display_errors', 1);
 require_once "db.php";
 
 
-/* =========================================
-   GET CASHIER ID
-========================================= */
 
 $cashierID = trim(
     $_GET["cashier_id"] ?? ""
@@ -20,9 +17,6 @@ if (empty($cashierID)) {
 }
 
 
-/* =========================================
-   GET FILTERS
-========================================= */
 
 $studentId = trim(
     $_GET["student_id"] ?? ""
@@ -34,9 +28,6 @@ $date = trim(
 );
 
 
-/* =========================================
-   GET CASHIER
-========================================= */
 
 $stmt = $conn->prepare("
     SELECT
@@ -78,9 +69,6 @@ if (!$cashier) {
 $stmt->close();
 
 
-/* =========================================
-   GET CANTEEN NAME
-========================================= */
 
 $canteenName = "None";
 
@@ -121,9 +109,6 @@ if (!empty($cashier["canteen_id"])) {
 }
 
 
-/* =========================================
-   INITIALS
-========================================= */
 
 $name = $cashier["Fname"];
 
@@ -157,11 +142,6 @@ $initials = substr(
 );
 
 
-/* =========================================
-   TRANSACTION HISTORY
-
-   ONLY TRANSACTIONS DONE BY THIS CASHIER
-========================================= */
 
 $transactionsQuery = "
     SELECT
@@ -184,9 +164,6 @@ $params = [
 $types = "s";
 
 
-/* =========================================
-   STUDENT ID FILTER
-========================================= */
 
 if ($studentId !== "") {
 
@@ -201,9 +178,6 @@ if ($studentId !== "") {
 
 
 
-/* =========================================
-   DATE FILTER
-========================================= */
 
 if ($date !== "") {
 
@@ -217,9 +191,6 @@ if ($date !== "") {
 }
 
 
-/* =========================================
-   ORDER
-========================================= */
 
 $transactionsQuery .= "
     ORDER BY date_time DESC
@@ -240,9 +211,6 @@ if (!$stmt) {
 }
 
 
-/* =========================================
-   BIND PARAMETERS
-========================================= */
 
 $stmt->bind_param(
     $types,
@@ -288,9 +256,6 @@ $transactionsResult =
 <div class="app">
 
 
-    <!-- =========================================
-         SIDEBAR
-    ========================================== -->
 
     <aside class="sidebar">
 
@@ -412,9 +377,6 @@ $transactionsResult =
         </nav>
 
 
-        <!-- =========================================
-             SIDEBAR FOOTER
-        ========================================== -->
 
         <div class="sidebar-footer">
 
@@ -445,16 +407,10 @@ $transactionsResult =
 
 
 
-    <!-- =========================================
-         MAIN
-    ========================================== -->
 
     <main style="width:100%;">
 
 
-        <!-- =========================================
-             TOPBAR
-        ========================================== -->
 
         <div class="topbar">
 
@@ -476,9 +432,6 @@ $transactionsResult =
 
 
 
-        <!-- =========================================
-             CASHIER INFORMATION
-        ========================================== -->
 
         <section class="card">
 
@@ -673,9 +626,6 @@ $transactionsResult =
 
 
 
-        <!-- =========================================
-             FILTERS
-        ========================================== -->
 
         <div
             style="
@@ -695,7 +645,6 @@ $transactionsResult =
             >
 
 
-                <!-- CASHIER ID -->
 
                 <input
                     type="hidden"
@@ -711,7 +660,6 @@ $transactionsResult =
 
 
 
-                <!-- STUDENT ID -->
 
                 <div
                     class="form-group"
@@ -740,7 +688,6 @@ $transactionsResult =
 
 
 
-                <!-- DATE -->
 
                 <div
                     class="form-group"
@@ -767,7 +714,6 @@ $transactionsResult =
 
 
 
-                <!-- FILTER -->
 
                 <button
                     type="submit"
@@ -778,7 +724,6 @@ $transactionsResult =
 
 
 
-                <!-- CLEAR -->
 
                 <a
                     href="view_cashier.php?cashier_id=<?php
@@ -809,9 +754,6 @@ $transactionsResult =
 
 
 
-        <!-- =========================================
-             TRANSACTION HISTORY
-        ========================================== -->
 
         <section
             class="card table-card"
@@ -904,7 +846,6 @@ $transactionsResult =
                             <tr>
 
 
-                                <!-- TRANSACTION ID -->
 
                                 <td>
 
@@ -922,7 +863,6 @@ $transactionsResult =
 
 
 
-                                <!-- STUDENT ID -->
 
                                 <td>
 
@@ -939,7 +879,6 @@ $transactionsResult =
                                 </td>
 
 
-                                <!-- TYPE -->
 
                                 <td>
 
@@ -957,7 +896,6 @@ $transactionsResult =
 
 
 
-                                <!-- DESCRIPTION -->
 
                                 <td>
 
@@ -976,7 +914,6 @@ $transactionsResult =
 
 
 
-                                <!-- AMOUNT -->
 
                                 <td>
 
@@ -995,7 +932,6 @@ $transactionsResult =
 
 
 
-                                <!-- DATE -->
 
                                 <td>
 
@@ -1059,9 +995,6 @@ $transactionsResult =
 
 
 
-        <!-- =========================================
-             BACK BUTTON
-        ========================================== -->
 
         <div style="margin-top:20px;">
 

@@ -171,7 +171,6 @@ if ($category === "cashier") {
     $password = $_POST["password"] ?? "";
     $pin = $_POST["pin"] ?? "";
 
-    // Required fields (Canteen ID is NOT required)
     if (
         $cashierID === "" ||
         $name === "" ||
@@ -185,7 +184,6 @@ if ($category === "cashier") {
         exit;
     }
 
-    // Check duplicate Cashier ID
     $checkCashier = $conn->prepare("
         SELECT cashier_id
         FROM cashiers
@@ -217,7 +215,6 @@ if ($category === "cashier") {
 
     $checkCashier->close();
 
-    // Check duplicate username
     $checkUsername = $conn->prepare("
         SELECT cashier_id
         FROM cashiers
@@ -249,13 +246,11 @@ if ($category === "cashier") {
 
     $checkUsername->close();
 
-    // Hash password
     $hashedPassword = password_hash(
         $password,
         PASSWORD_DEFAULT
     );
 
-    // Hash PIN if provided
     $hashedPin = null;
 
     if ($pin !== "") {
@@ -265,7 +260,6 @@ if ($category === "cashier") {
         );
     }
 
-    // Create cashier without requiring a canteen ID
     $insertCashier = $conn->prepare("
         INSERT INTO cashiers
         (

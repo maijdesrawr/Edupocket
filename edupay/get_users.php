@@ -59,7 +59,8 @@ try {
                 COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(p.first_name, ''), NULLIF(p.last_name, ''))), ''), p.Fname) AS name,
                 (SELECT GROUP_CONCAT(DISTINCT COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(s2.first_name, ''), NULLIF(s2.last_name, ''))), ''), s2.Fname) ORDER BY s2.student_num SEPARATOR ', ') FROM students s2 WHERE s2.parent_id = p.parent_id OR EXISTS (SELECT 1 FROM parent_student_link l WHERE l.parent_id = p.parent_id AND l.student_num = s2.student_num)) AS student_name,
                 (SELECT GROUP_CONCAT(DISTINCT s2.student_num ORDER BY s2.student_num SEPARATOR ', ') FROM students s2 WHERE s2.parent_id = p.parent_id OR EXISTS (SELECT 1 FROM parent_student_link l WHERE l.parent_id = p.parent_id AND l.student_num = s2.student_num)) AS student_nums, 
-                p.profile_photo
+                p.profile_photo,
+                'parents' AS account_source
             FROM parents p
 
         ");
@@ -70,7 +71,8 @@ try {
                 canteen_id, 
                 Fname AS name,         
                 location, 
-                profile_photo
+                profile_photo,
+                'canteens' AS account_source
             FROM canteens
         ");
     } elseif ($category === 'cashier') {
@@ -81,7 +83,8 @@ try {
                     cashier_id, 
                     Fname AS name,
                     username,
-                    profile_photo
+                    profile_photo,
+                    'cashiers' AS account_source
                 FROM cashiers
             ");
         } elseif (table_exists($conn, 'admins') && column_exists($conn, 'admins', 'role')) {
@@ -91,7 +94,8 @@ try {
                     admin_id AS cashier_id,
                     Fname AS name,
                     username,
-                    profile_photo
+                    profile_photo,
+                    'admins' AS account_source
                 FROM admins
                 WHERE LOWER(COALESCE(role, '')) = 'cashier'
             ");
@@ -116,6 +120,35 @@ try {
     }
 
     while ($row = $query->fetch_assoc()) {
+        if ($category !== 'student' && table_exists($conn, 'admin_account_locks')) {
+            $role = match ($category) {
+                'parent' => 'parent',
+                'pos' => 'canteen',
+                'cashier' => 'cashier',
+            };
+            $idField = match ($category) {
+                'parent' => 'parent_id',
+                'pos' => 'canteen_id',
+                'cashier' => 'cashier_id',
+            };
+            $accountSource = (string)($row['account_source'] ?? '');
+            $userId = (string)($row[$idField] ?? '');
+            $lockStatement = $conn->prepare(
+                'SELECT is_locked FROM admin_account_locks '
+                    . 'WHERE role = ? AND account_source = ? AND user_id = ? LIMIT 1'
+            );
+            if ($lockStatement) {
+                $lockStatement->bind_param('sss', $role, $accountSource, $userId);
+                $lockStatement->execute();
+                $lockRow = $lockStatement->get_result()->fetch_assoc();
+                $row['is_locked'] = (int)($lockRow['is_locked'] ?? 0);
+                $lockStatement->close();
+            } else {
+                $row['is_locked'] = 0;
+            }
+        } elseif ($category !== 'student') {
+            $row['is_locked'] = 0;
+        }
         $photoPath = normalize_profile_photo_path($row['profile_photo'] ?? null);
         $row['photo_url'] = profile_photo_url($photoPath);
         $data[] = $row;

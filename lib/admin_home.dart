@@ -789,11 +789,16 @@ class _AdminHomeState extends State<AdminHome> {
                         style: const TextStyle(
                             fontWeight: FontWeight.w600, fontSize: 13)),
                     const SizedBox(height: 3),
-                    Text('${item['created_at'] ?? ''}',
+                    Text(_formatActivityTimestamp(item['created_at']),
                         style: const TextStyle(
                             color: Colors.black38, fontSize: 10))
                   ]));
         }).toList());
+
+  String _formatActivityTimestamp(dynamic value) {
+    final timestamp = value?.toString() ?? '';
+    return timestamp.replaceFirst(RegExp(r'\.\d+'), '');
+  }
 
   Widget _whiteMessage(String text) => Container(
       width: double.infinity,

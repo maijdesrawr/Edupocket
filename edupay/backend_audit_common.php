@@ -9,14 +9,12 @@ const BA_MAX_STRING_BYTES = 512;
 const BA_DEFAULT_DATABASE_CONFIG_PATH = 'C:/xampp/edupocket-config/database.php';
 const BA_DEFAULT_SECURITY_CONFIG_PATH = 'C:/xampp/edupocket-config/security.php';
 
-/** @return array<string, mixed> */
 function ba_state(): array
 {
     $state = $GLOBALS['EDUPOCKET_BACKEND_AUDIT_STATE'] ?? null;
     return is_array($state) ? $state : [];
 }
 
-/** @param array<string, mixed> $state */
 function ba_store_state(array $state): void
 {
     $GLOBALS['EDUPOCKET_BACKEND_AUDIT_STATE'] = $state;
@@ -113,7 +111,6 @@ function ba_mark_outcome(string $outcome): void
     ba_store_state($state);
 }
 
-/** @param array<string, mixed> $payload */
 function ba_observe_response_payload(array $payload): void
 {
     $status = strtolower(trim((string)($payload['status'] ?? '')));
@@ -135,7 +132,6 @@ function ba_observe_response_payload(array $payload): void
     }
 }
 
-/** @return array<string, mixed>|null */
 function ba_load_database_config(): ?array
 {
     $state = ba_state();
@@ -215,7 +211,6 @@ function ba_sensitive_key(string $key): bool
     ) === 1;
 }
 
-/** @return mixed */
 function ba_sanitize_metadata_value($value, string $key = '', int $depth = 0)
 {
     if ($key !== '' && ba_sensitive_key($key)) {
@@ -273,7 +268,6 @@ function ba_sanitize_metadata_value($value, string $key = '', int $depth = 0)
     return '[' . get_debug_type($value) . ' omitted]';
 }
 
-/** @return array<string, mixed> */
 function ba_file_metadata(): array
 {
     $result = [];
@@ -291,7 +285,6 @@ function ba_file_metadata(): array
     return $result;
 }
 
-/** @return array<string, mixed> */
 function ba_request_metadata(): array
 {
     $contentType = strtolower(trim((string)($_SERVER['CONTENT_TYPE'] ?? '')));
@@ -331,7 +324,6 @@ function ba_request_metadata(): array
     return $metadata;
 }
 
-/** @param array<string, mixed> $metadata */
 function ba_metadata_json(array $metadata): string
 {
     $json = json_encode(
@@ -420,7 +412,6 @@ function ba_session_token_hash(): ?string
     return hash('sha256', $token);
 }
 
-/** @return array{session_id:int,authenticated:int,role:string,account_source:string,user_id:string} */
 function ba_resolve_actor(mysqli $conn): array
 {
     $unknown = [
@@ -515,7 +506,6 @@ function ba_request_ip_hash(): string
     return ba_ip_hash_with_key($address, $key);
 }
 
-/** @return array{status:int,outcome:string} */
 function ba_response_result(): array
 {
     $status = http_response_code();

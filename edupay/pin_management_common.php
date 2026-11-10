@@ -42,7 +42,6 @@ function pm_hash_pin(string $pin): string
     return $hash;
 }
 
-/** @return array<string, string> */
 function pm_pin_target(mysqli $conn, string $role, string $accountSource): array
 {
     $target = pc_target_for_source($role, $accountSource);

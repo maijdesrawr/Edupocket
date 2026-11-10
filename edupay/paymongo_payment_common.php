@@ -83,7 +83,6 @@ function pm_verify_webhook_signature(string $payload, string $header): bool
     return hash_equals($expected, $signature);
 }
 
-/** @return array<string, mixed> */
 function pm_pending_payment(mysqli $conn, string $checkoutId): array
 {
     $statement = pm_prepare(
@@ -100,7 +99,6 @@ function pm_pending_payment(mysqli $conn, string $checkoutId): array
     return $payment;
 }
 
-/** @return array<string, mixed> */
 function pm_retrieve_checkout_session(string $checkoutId): array
 {
     $curl = curl_init();
@@ -229,11 +227,6 @@ function pm_verify_paid_checkout(array $pending, array $session): array
     throw new RuntimeException('PayMongo has not confirmed a matching paid transaction.');
 }
 
-/**
- * Credit a verified checkout exactly once.
- *
- * @return array<string, mixed>
- */
 function pm_fulfill_verified_checkout(
     mysqli $conn,
     string $checkoutId,
@@ -420,7 +413,6 @@ function pm_fulfill_verified_checkout(
     }
 }
 
-/** @return array<string, mixed> */
 function pm_verify_and_fulfill(mysqli $conn, string $checkoutId): array
 {
     $checkoutId = pm_checkout_id($checkoutId);

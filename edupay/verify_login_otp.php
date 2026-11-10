@@ -42,6 +42,7 @@ try {
     $accountSource = (string)$challenge['account_source'];
     $userId = (string)$challenge['user_id'];
     $account = pc_fetch_account_for_update($conn, $role, $userId, $accountSource);
+    as_assert_account_unlocked($conn, $role, $accountSource, $userId);
     $actualFingerprint = pc_account_fingerprint(
         $role,
         $accountSource,

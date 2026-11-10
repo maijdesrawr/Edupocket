@@ -14,9 +14,6 @@ $response = [
 ];
 
 
-/* =========================================
-   CHECK REQUEST METHOD
-========================================= */
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 
@@ -28,9 +25,6 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 }
 
 
-/* =========================================
-   GET FORM DATA
-========================================= */
 
 $admin_id = trim($_POST["admin_id"] ?? "");
 $name = trim($_POST["name"] ?? "");
@@ -38,9 +32,6 @@ $role = trim($_POST["role"] ?? "");
 $password = $_POST["password"] ?? "";
 
 
-/* =========================================
-   VALIDATE REQUIRED FIELDS
-========================================= */
 
 if (
     empty($admin_id) ||
@@ -58,9 +49,6 @@ if (
 }
 
 
-/* =========================================
-   VALIDATE ROLE
-========================================= */
 
 $allowedRoles = [
     "system admin",
@@ -78,9 +66,6 @@ if (!in_array($role, $allowedRoles, true)) {
 }
 
 
-/* =========================================
-   CHECK ADMIN ID
-========================================= */
 
 $stmt = $conn->prepare("
     SELECT admin_id
@@ -122,9 +107,6 @@ if ($result->num_rows > 0) {
 $stmt->close();
 
 
-/* =========================================
-   HASH PASSWORD
-========================================= */
 
 $hashedPassword = password_hash(
     $password,
@@ -132,9 +114,6 @@ $hashedPassword = password_hash(
 );
 
 
-/* =========================================
-   INSERT ADMIN
-========================================= */
 
 $stmt = $conn->prepare("
     INSERT INTO admins
@@ -166,9 +145,6 @@ if (!$stmt) {
 }
 
 
-/* =========================================
-   BIND VALUES
-========================================= */
 
 $stmt->bind_param(
     "ssss",
@@ -179,9 +155,6 @@ $stmt->bind_param(
 );
 
 
-/* =========================================
-   EXECUTE INSERT
-========================================= */
 
 if ($stmt->execute()) {
 
@@ -199,18 +172,12 @@ if ($stmt->execute()) {
 }
 
 
-/* =========================================
-   CLOSE
-========================================= */
 
 $stmt->close();
 
 $conn->close();
 
 
-/* =========================================
-   RETURN JSON
-========================================= */
 
 echo json_encode($response);
 

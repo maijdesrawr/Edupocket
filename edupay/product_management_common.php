@@ -6,7 +6,6 @@ require_once __DIR__ . '/app_session_common.php';
 
 const PM_MAX_STOCK_QUANTITY = 1000000;
 
-/** @return array<string, mixed> */
 function pm_require_canteen_session(mysqli $conn): array
 {
     $session = as_require_session($conn);
@@ -134,9 +133,6 @@ function pm_post_product_id(): int
     return (int)$value;
 }
 
-/** @param array<string, mixed> $row
- *  @return array<string, mixed>
- */
 function pm_public_product(array $row): array
 {
     return [
@@ -187,7 +183,6 @@ function pm_build_purchase_description(array $items): string
     return $description;
 }
 
-/** @param array<string, mixed> $session */
 function pm_record_failure(
     mysqli $conn,
     array $session,
