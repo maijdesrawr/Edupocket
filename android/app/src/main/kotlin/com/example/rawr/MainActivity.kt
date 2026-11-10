@@ -5,10 +5,13 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -48,6 +51,58 @@ class MainActivity : FlutterActivity() {
                     result.success(shown)
                 }
                 else -> result.notImplemented()
+            }
+        }
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "edupocket/admin_exports",
+        ).setMethodCallHandler { call, result ->
+            if (call.method != "exportCsv") {
+                result.notImplemented()
+                return@setMethodCallHandler
+            }
+            val fileName = call.argument<String>("fileName") ?: "EduPocket_sales.csv"
+            val title = call.argument<String>("title") ?: "EduPocket sales"
+            val csv = call.argument<String>("csv") ?: ""
+            try {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    result.error("unsupported_android", "CSV export requires Android 10 or later.", null)
+                    return@setMethodCallHandler
+                }
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                    put(MediaStore.Downloads.MIME_TYPE, "text/csv")
+                    put(
+                        MediaStore.Downloads.RELATIVE_PATH,
+                        "${Environment.DIRECTORY_DOWNLOADS}/EduPocket",
+                    )
+                    put(MediaStore.Downloads.IS_PENDING, 1)
+                }
+                val uri = contentResolver.insert(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    values,
+                ) ?: throw IllegalStateException("Could not create the CSV file.")
+                contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use {
+                    it.write(csv)
+                } ?: throw IllegalStateException("Could not write the CSV file.")
+                contentResolver.update(
+                    uri,
+                    ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) },
+                    null,
+                    null,
+                )
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/csv"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_TITLE, title)
+                    clipData = android.content.ClipData.newUri(contentResolver, fileName, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                startActivity(Intent.createChooser(shareIntent, title))
+                result.success(fileName)
+            } catch (error: Exception) {
+                result.error("csv_export_failed", error.message ?: "Could not export the CSV file.", null)
             }
         }
     }

@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/admin_account_common.php';
+require_once __DIR__ . '/receipt_common.php';
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') throw new InvalidArgumentException('POST is required.');
     $session = account_admin($conn);
@@ -9,7 +10,17 @@ try {
     $id = trim((string)($_POST['id'] ?? ''));
     if ($id === '') throw new InvalidArgumentException('Account ID is required.');
     $conn->begin_transaction();
-    if (!account_query($conn, "SELECT `$key` FROM `$table` WHERE `$key` = ? FOR UPDATE", [$id])->get_result()->fetch_assoc()) throw new InvalidArgumentException('Account not found.');
+    $accountRow = account_query($conn, "SELECT * FROM `$table` WHERE `$key` = ? FOR UPDATE", [$id])->get_result()->fetch_assoc();
+    if (!$accountRow) throw new InvalidArgumentException('Account not found.');
+    $accountName = trim((string)($accountRow['first_name'] ?? '') . ' ' . (string)($accountRow['last_name'] ?? ''));
+    if ($accountName === '') $accountName = trim((string)($accountRow['Fname'] ?? 'Account'));
+    $maskedName = trim((string)($accountRow['first_name'] ?? '')) !== ''
+        && trim((string)($accountRow['last_name'] ?? '')) !== ''
+        ? receipt_mask_name_parts(
+            (string)$accountRow['first_name'],
+            (string)$accountRow['last_name']
+        )
+        : receipt_mask_student_name($accountName);
     if ($category === 'parent') {
         account_query($conn, 'UPDATE students SET parent_id = NULL WHERE parent_id = ?', [$id]);
         account_query($conn, 'UPDATE topups SET parent_id = NULL WHERE parent_id = ?', [$id]);
@@ -32,7 +43,7 @@ try {
     account_query($conn, 'DELETE FROM parent_student_link WHERE student_num = ?', [$id]);
     }
     account_query($conn, "DELETE FROM `$table` WHERE `$key` = ?", [$id]);
-    as_record_activity($conn, $session, 'account_deleted', ['category'=>$category,'account_id'=>$id], 'server');
+    as_record_activity($conn, $session, 'account_deleted', ['category'=>$category,'account_id'=>$id,'display_name'=>$maskedName], 'server');
     $conn->commit();
     echo json_encode(['status'=>'success','message'=>'Account deleted successfully.']);
 } catch (Throwable $e) {

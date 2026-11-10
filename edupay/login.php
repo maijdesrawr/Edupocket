@@ -33,6 +33,13 @@ try {
 
     $storedCredential = (string)($account['password_value'] ?? '');
     if (!pc_password_matches($password, $storedCredential)) {
+        as_record_security_attempt(
+            $conn,
+            pc_normalize_role((string)$account['app_role']),
+            (string)$account['account_source'],
+            (string)$account['id'],
+            'login_password'
+        );
         if (!pc_is_password_hash($storedCredential)) {
             password_verify($password, LO_DUMMY_PASSWORD_HASH);
         }

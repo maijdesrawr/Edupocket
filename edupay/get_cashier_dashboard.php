@@ -24,7 +24,7 @@ if ($balanceStmt) {
 $sqlTxn = "
 SELECT 
     t.transaction_id,
-    s.Fname AS student_name,
+    COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(s.first_name, ''), NULLIF(s.last_name, ''))), ''), s.Fname) AS student_name,
     t.amount,
     COALESCE(NULLIF(t.description, ''), CASE WHEN t.transaction_type = 'top-up' THEN 'Student Top-up' ELSE 'Payment' END) AS description,
     t.transaction_type,

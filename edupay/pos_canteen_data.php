@@ -22,11 +22,10 @@ try {
     exit();
 }
 
-// Fetch all transactions
 $query = "
     SELECT 
         t.id,
-        s.Fname AS student_name,
+        COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(s.first_name, ''), NULLIF(s.last_name, ''))), ''), s.Fname) AS student_name,
         t.payment_title,
         t.amount,
         t.timestamp

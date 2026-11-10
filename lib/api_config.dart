@@ -1,7 +1,7 @@
 class ApiConfig {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.254.107/edupay',
+    defaultValue: 'http://192.168.254.184/edupay',
   );
 
   static bool usesProtectedOrLocalTransport(Uri uri) {

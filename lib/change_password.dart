@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'api_config.dart';
 import 'app_session_service.dart';
 import 'login.dart';
-import 'package:flutter/services.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   final String id;
@@ -26,13 +25,9 @@ class ChangePasswordPage extends StatefulWidget {
 class _ChangePasswordPageState extends State<ChangePasswordPage> {
   final newPasswordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
-  final newPinController = TextEditingController();
-  final confirmPinController = TextEditingController();
 
   bool obscurePassword = true;
   bool obscureConfirmPassword = true;
-  bool obscurePin = true;
-  bool obscureConfirmPin = true;
   bool isSaving = false;
 
   static const Color primaryRed = Color(0xFFE53935);
@@ -48,24 +43,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password);
   }
 
-  bool isValidPin(String pin) {
-    if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
-      return false;
-    }
-
-    if (RegExp(r'^(\d)\1{5}$').hasMatch(pin)) {
-      return false;
-    }
-
-    return true;
-  }
-
   @override
   void dispose() {
     newPasswordController.dispose();
     confirmPasswordController.dispose();
-    newPinController.dispose();
-    confirmPinController.dispose();
     super.dispose();
   }
 
@@ -74,12 +55,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
     final newPassword = newPasswordController.text.trim();
     final confirmPassword = confirmPasswordController.text.trim();
-    final newPin = newPinController.text.trim();
-    final confirmPin = confirmPinController.text.trim();
-
-    if (newPassword.isEmpty ||
-        confirmPassword.isEmpty ||
-        (widget.role == "student" && (newPin.isEmpty || confirmPin.isEmpty))) {
+    if (newPassword.isEmpty || confirmPassword.isEmpty) {
       showMessage("Please fill all fields");
       return;
     }
@@ -96,20 +72,6 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       return;
     }
 
-    if (widget.role == "student") {
-      if (newPin != confirmPin) {
-        showMessage("PIN does not match");
-        return;
-      }
-
-      if (!isValidPin(newPin)) {
-        showMessage(
-          "PIN must be exactly 6 digits and cannot contain repeating numbers",
-        );
-        return;
-      }
-    }
-
     setState(() => isSaving = true);
 
     try {
@@ -121,7 +83,6 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
           "role": widget.role,
           "current_password": widget.currentPassword,
           "password": newPassword,
-          "pin": widget.role == "student" ? newPin : "",
         },
       ).timeout(const Duration(seconds: 8));
 
@@ -282,35 +243,6 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     );
   }
 
-  Widget pinField({
-    required String label,
-    required TextEditingController controller,
-    required bool obscure,
-    required VoidCallback toggle,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: TextInputType.number,
-      maxLength: 6,
-      obscureText: obscure,
-      enabled: !isSaving,
-      inputFormatters: [
-        FilteringTextInputFormatter.digitsOnly,
-      ],
-      decoration: fieldDecoration(
-        label: label,
-        icon: Icons.pin_outlined,
-        suffixIcon: IconButton(
-          onPressed: toggle,
-          icon: Icon(
-            obscure ? Icons.visibility_off : Icons.visibility,
-            color: Colors.grey,
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -423,41 +355,6 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                           });
                                         },
                                       ),
-                                      if (widget.role == "student") ...[
-                                        const SizedBox(height: 28),
-                                        const Divider(
-                                          color: Color(0xFFEEEEEE),
-                                        ),
-                                        const SizedBox(height: 22),
-                                        sectionHeading(
-                                          'Payment PIN',
-                                          'Create your 6-digit transaction PIN',
-                                          Icons.password_outlined,
-                                        ),
-                                        const SizedBox(height: 18),
-                                        pinField(
-                                          label: 'New PIN',
-                                          controller: newPinController,
-                                          obscure: obscurePin,
-                                          toggle: () {
-                                            setState(() {
-                                              obscurePin = !obscurePin;
-                                            });
-                                          },
-                                        ),
-                                        const SizedBox(height: 15),
-                                        pinField(
-                                          label: 'Confirm PIN',
-                                          controller: confirmPinController,
-                                          obscure: obscureConfirmPin,
-                                          toggle: () {
-                                            setState(() {
-                                              obscureConfirmPin =
-                                                  !obscureConfirmPin;
-                                            });
-                                          },
-                                        ),
-                                      ],
                                       const SizedBox(height: 22),
                                       Container(
                                         width: double.infinity,
@@ -479,7 +376,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                             SizedBox(width: 10),
                                             Expanded(
                                               child: Text(
-                                                'Your password must have at least 8 characters, uppercase and lowercase letters, a number, and a special character. Your PIN must contain 6 digits.',
+                                                'Your password must have at least 8 characters, uppercase and lowercase letters, a number, and a special character. You can set or change your payment PIN later in your account settings.',
                                                 style: TextStyle(
                                                   color: darkRed,
                                                   fontSize: 12,

@@ -12,7 +12,7 @@ $sql = "
         t.transaction_type,
         t.description,
         t.date_time,
-        s.Fname AS student_name,
+        COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(s.first_name, ''), NULLIF(s.last_name, ''))), ''), s.Fname) AS student_name,
         s.student_num
     FROM transactions t
     JOIN students s ON t.student_num = s.student_num

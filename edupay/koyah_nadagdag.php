@@ -1,10 +1,29 @@
 <?php
-require_once __DIR__ . '/cors_common.php';
-error_reporting(E_ALL);
-ini_set('display_errors', 0);
 
-header('Content-Type: application/json');
-include 'db_connect.php';
+declare(strict_types=1);
+
+require_once __DIR__ . '/student_account_provisioning_common.php';
+
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+pc_bootstrap_json_endpoint();
+
+$conn = null;
+try {
+    pc_require_post();
+    $conn = pc_open_database();
+    $adminSession = as_require_session($conn);
+    as_assert_session_role($adminSession, ['admin']);
+} catch (PasswordChangeClientException $error) {
+    if ($conn instanceof mysqli) $conn->close();
+    if (http_response_code() < 400) http_response_code(401);
+    pc_respond(pc_client_error_payload($error->getMessage(), $error->details()));
+} catch (Throwable $error) {
+    if ($conn instanceof mysqli) $conn->close();
+    error_log('koyah_nadagdag.php authorization failed: ' . $error->getMessage());
+    http_response_code(500);
+    pc_respond(pc_client_error_payload('User management is temporarily unavailable.'));
+}
 
 function generateTempPassword($length = 8) {
     $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -19,24 +38,18 @@ function generateTempPassword($length = 8) {
 
 function generateTempPIN()
 {
-    return str_pad(random_int(0,999999), 6, '0', STR_PAD_LEFT);
+    return str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 }
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['status' => 'error', 'message' => 'Invalid request method']);
-    exit;
-}
-
 
 $category = $_POST['category'] ?? '';
 $action = $_POST['action'] ?? '';
 
 if (empty($category) && empty($action)) {
-    echo json_encode([
+    $conn->close();
+    pc_respond([
         'status' => 'error',
         'message' => 'Category or action is required'
     ]);
-    exit;
 }
 
 function sanitize($conn, $value) {
@@ -88,12 +101,40 @@ if ($action === 'get_parents') {
 
     $stmt->close();
 
-    echo json_encode([
+    $conn->close();
+    pc_respond([
         'status' => 'success',
         'parents' => $parents
     ]);
+}
 
-    exit;
+if ($action === 'lookup_dummy_student') {
+    try {
+        $student = sap_find_dummy_student(
+            $conn,
+            pc_post_string('qr_value')
+        );
+        if ($student === null) {
+            http_response_code(404);
+            pc_reject('This QR was not found in the dummy student directory.');
+        }
+        sap_assert_student_not_registered($conn, (string)$student['student_num']);
+        $student['email'] = sap_student_email($student);
+        $conn->close();
+        pc_respond(['status' => 'success', 'student' => $student]);
+    } catch (PasswordChangeClientException $error) {
+        $conn->close();
+        pc_respond(pc_client_error_payload($error->getMessage(), $error->details()));
+    } catch (InvalidArgumentException $error) {
+        $conn->close();
+        http_response_code(404);
+        pc_respond(pc_client_error_payload($error->getMessage()));
+    } catch (Throwable $error) {
+        $conn->close();
+        error_log('Dummy student lookup failed: ' . $error->getMessage());
+        http_response_code(500);
+        pc_respond(pc_client_error_payload('The student roster lookup failed.'));
+    }
 }
 
 
@@ -121,7 +162,7 @@ function generateParentID($conn)
         $lastSequence = (int) substr($row['parent_id'], 2);
 
         $nextSequence = str_pad(
-            $lastSequence + 1,
+            (string) ($lastSequence + 1),
             9,
             '0',
             STR_PAD_LEFT
@@ -141,10 +182,30 @@ switch ($category) {
 
 case 'student':
 
-    $student_first_name = sanitize($conn, $_POST['student_first_name'] ?? '');
-    $student_middle_name = sanitize($conn, $_POST['student_middle_name'] ?? '');
-    $student_last_name = sanitize($conn, $_POST['student_last_name'] ?? '');
-    $student_suffix = sanitize($conn, $_POST['student_suffix'] ?? '');
+    $student_num = sanitize($conn, $_POST['student_num'] ?? '');
+    $student_roster = sap_find_dummy_student($conn, $student_num);
+    if ($student_roster === null) {
+        $response['message'] = 'Scan a student QR from the dummy student directory.';
+        break;
+    }
+    try {
+        sap_assert_student_not_registered($conn, (string)$student_roster['student_num']);
+        $student_email = sap_student_email($student_roster);
+        $email_config = pc_security_config();
+        ev_require_schema($conn);
+        sap_assert_student_email_available($conn, $student_email, $email_config);
+    } catch (Throwable $error) {
+        $response['message'] = $error instanceof InvalidArgumentException
+            ? $error->getMessage()
+            : 'Student email is unavailable. Check the email setup and try again.';
+        break;
+    }
+
+    $student_num = (string)$student_roster['student_num'];
+    $student_first_name = (string)$student_roster['first_name'];
+    $student_middle_name = (string)($student_roster['middle_name'] ?? '');
+    $student_last_name = (string)$student_roster['last_name'];
+    $student_suffix = (string)($student_roster['suffix'] ?? '');
 
     $parent_first_name = sanitize($conn, $_POST['parent_first_name'] ?? '');
     $parent_middle_name = sanitize($conn, $_POST['parent_middle_name'] ?? '');
@@ -164,8 +225,6 @@ case 'student':
         $parent_last_name . ' ' .
         $parent_suffix
     );
-
-    $student_num = sanitize($conn, $_POST['student_num'] ?? '');
 
     if (
         empty($student_first_name) ||
@@ -193,7 +252,10 @@ case 'student':
     $student_pin = password_hash($student_temp_pin, PASSWORD_DEFAULT);
     $qr_code = 'QR_' . $student_num;
 
-    $conn->begin_transaction();
+    if (!$conn->begin_transaction()) {
+        $response['message'] = 'Account creation could not be started.';
+        break;
+    }
 
     try {
         $parent_id = generateParentID($conn);
@@ -253,35 +315,93 @@ case 'student':
         executeOrThrow($link_stmt);
         $link_stmt->close();
 
-        $conn->commit();
+        ev_save_verified_email(
+            $conn,
+            'student',
+            'students',
+            $student_num,
+            $student_email,
+            $email_config
+        );
+        try {
+            sap_send_student_credentials(
+                $student_email,
+                $student_name,
+                $student_num,
+                $student_temp_password,
+                $student_temp_pin,
+                $email_config,
+                $parent_id,
+                $parent_temp_password
+            );
+        } catch (Throwable $emailError) {
+            error_log('Student credential email delivery failed: ' . $emailError->getMessage());
+            throw new RuntimeException('STUDENT_CREDENTIAL_EMAIL_FAILED', 0, $emailError);
+        }
+
+        as_record_activity($conn, $adminSession, 'student_family_account_created', [
+            'student_num' => $student_num,
+            'parent_id' => $parent_id,
+            'category' => $category,
+        ], 'server', 'success', $email_config);
+        if (!$conn->commit()) {
+            throw new RuntimeException('Student account creation could not be committed.');
+        }
 
         $response = [
             'status' => 'success',
-            'message' => 'Student and Parent account created successfully',
-            'student_num' => $student_num,
-            'parent_id' => $parent_id,
-            'student_temp_password' => $student_temp_password,
-            'parent_temp_password' => $parent_temp_password,
-            'student_temp_pin' => $student_temp_pin
+            'message' => 'Account created. Login credentials have been sent to the student email.'
         ];
     } catch (Throwable $error) {
         $conn->rollback();
-        $response['message'] = $error->getCode() === 1062
-            ? 'Student Number already exists'
-            : 'Unable to create the student and parent accounts: ' . $error->getMessage();
+        $diagnostic = preg_replace(
+            '/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i',
+            '[email]',
+            $error->getMessage()
+        ) ?? 'unknown error';
+        $diagnostic = preg_replace('/\b\d{7,}\b/', '[id]', $diagnostic) ?? $diagnostic;
+        error_log(
+            'Student account creation failed (' . get_class($error) . ':'
+                . $error->getCode() . '): ' . $diagnostic
+        );
+        if ($error->getMessage() === 'STUDENT_CREDENTIAL_EMAIL_FAILED') {
+            $response['message'] = 'The email does not exist. Please try again later.';
+            $response['error_code'] = 'email_delivery_failed';
+        } else {
+            $response['message'] = $error->getCode() === 1062
+                ? 'Student Number already exists'
+                : 'The student account could not be created.';
+        }
     }
     break;
 
 case 'child':
 
     $parent_id = sanitize($conn, $_POST['parent_id'] ?? '');
-
-    $student_first_name = sanitize($conn, $_POST['student_first_name'] ?? '');
-    $student_middle_name = sanitize($conn, $_POST['student_middle_name'] ?? '');
-    $student_last_name = sanitize($conn, $_POST['student_last_name'] ?? '');
-    $student_suffix = sanitize($conn, $_POST['student_suffix'] ?? '');
-
     $student_num = sanitize($conn, $_POST['student_num'] ?? '');
+    $student_roster = sap_find_dummy_student($conn, $student_num);
+    if ($student_roster === null) {
+        $response['message'] = 'Scan a student QR from the dummy student directory.';
+        break;
+    }
+    try {
+        sap_assert_student_not_registered($conn, (string)$student_roster['student_num']);
+        $student_email = sap_student_email($student_roster);
+        $email_config = pc_security_config();
+        ev_require_schema($conn);
+        sap_assert_student_email_available($conn, $student_email, $email_config);
+    } catch (Throwable $error) {
+        $response['message'] = $error instanceof InvalidArgumentException
+            ? $error->getMessage()
+            : 'Student email is unavailable. Check the email setup and try again.';
+        break;
+    }
+
+    $student_num = (string)$student_roster['student_num'];
+    $student_first_name = (string)$student_roster['first_name'];
+    $student_middle_name = (string)($student_roster['middle_name'] ?? '');
+    $student_last_name = (string)$student_roster['last_name'];
+    $student_suffix = (string)($student_roster['suffix'] ?? '');
 
     $student_name = trim(
         $student_first_name . ' ' .
@@ -327,22 +447,12 @@ if (!ctype_digit($student_num) || strlen($student_num) != 11) {
     $student_temp_pin = generateTempPIN();
     $student_pin = password_hash($student_temp_pin, PASSWORD_DEFAULT);
 
-    $check_student = prepareOrThrow(
-        $conn,
-        'SELECT student_num FROM students WHERE student_num = ? LIMIT 1'
-    );
-    $check_student->bind_param('s', $student_num);
-    executeOrThrow($check_student);
-    $student_exists = $check_student->get_result();
-    $check_student->close();
-
-    if ($student_exists && $student_exists->num_rows > 0) {
-        $response['message'] = 'Student already exists';
+    if (!$conn->begin_transaction()) {
+        $response['message'] = 'Account creation could not be started.';
         break;
     }
 
     $qr_code = 'QR_' . $student_num;
-    $conn->begin_transaction();
 
     try {
         $student_stmt = prepareOrThrow(
@@ -378,21 +488,61 @@ if (!ctype_digit($student_num) || strlen($student_num) != 11) {
         executeOrThrow($link_stmt);
         $link_stmt->close();
 
-        $conn->commit();
+        ev_save_verified_email(
+            $conn,
+            'student',
+            'students',
+            $student_num,
+            $student_email,
+            $email_config
+        );
+        try {
+            sap_send_student_credentials(
+                $student_email,
+                $student_name,
+                $student_num,
+                $student_temp_password,
+                $student_temp_pin,
+                $email_config
+            );
+        } catch (Throwable $emailError) {
+            error_log('Student credential email delivery failed: ' . $emailError->getMessage());
+            throw new RuntimeException('STUDENT_CREDENTIAL_EMAIL_FAILED', 0, $emailError);
+        }
+
+        as_record_activity($conn, $adminSession, 'student_account_created', [
+            'student_num' => $student_num,
+            'parent_id' => $parent_id,
+            'category' => $category,
+        ], 'server', 'success', $email_config);
+        if (!$conn->commit()) {
+            throw new RuntimeException('Student account creation could not be committed.');
+        }
 
         $response = [
             'status' => 'success',
-            'message' => 'Child account created successfully',
-            'student_num' => $student_num,
-            'parent_id' => $parent_id,
-            'student_temp_password' => $student_temp_password,
-            'student_temp_pin' => $student_temp_pin
+            'message' => 'Account created. Login credentials have been sent to the student email.'
         ];
     } catch (Throwable $error) {
         $conn->rollback();
-        $response['message'] = $error->getCode() === 1062
-            ? 'Student already exists'
-            : 'Unable to create the child account: ' . $error->getMessage();
+        $diagnostic = preg_replace(
+            '/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i',
+            '[email]',
+            $error->getMessage()
+        ) ?? 'unknown error';
+        $diagnostic = preg_replace('/\b\d{7,}\b/', '[id]', $diagnostic) ?? $diagnostic;
+        error_log(
+            'Child account creation failed (' . get_class($error) . ':'
+                . $error->getCode() . '): ' . $diagnostic
+        );
+        if ($error->getMessage() === 'STUDENT_CREDENTIAL_EMAIL_FAILED') {
+            $response['message'] = 'The email does not exist. Please try again later.';
+            $response['error_code'] = 'email_delivery_failed';
+        } else {
+            $response['message'] = $error->getCode() === 1062
+                ? 'Student already exists'
+                : 'The student account could not be created.';
+        }
     }
 
 break;
@@ -446,5 +596,6 @@ case 'cashier':
 
 }
 
-echo json_encode($response);
+$conn->close();
+pc_respond($response);
 ?>

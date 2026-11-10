@@ -8,6 +8,7 @@ header('Content-Type: application/json; charset=utf-8');
 include 'db_connect.php';
 require_once __DIR__ . '/app_session_common.php';
 require_once __DIR__ . '/student_dashboard_common.php';
+require_once __DIR__ . '/receipt_common.php';
 
 function respond_json(array $payload): void
 {
@@ -84,7 +85,10 @@ while ($row = $result->fetch_assoc()) {
         'transaction_type' => $row['transaction_type'] ?? '',
         'transaction_label' => sd_transaction_label($type),
         'display_type' => sd_transaction_label($type),
-        'description' => $row['description'] ?? '',
+        'description' => receipt_transfer_detail_without_middle(
+            $conn,
+            (string)($row['description'] ?? '')
+        ),
         'date' => $eventTime ? date('Y-m-d', strtotime($eventTime)) : '',
         'date_time' => $eventTime,
         'cashier_id' => $row['cashier_id'] ?? null,

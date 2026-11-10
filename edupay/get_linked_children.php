@@ -11,7 +11,7 @@ if (empty($parent_id)) {
 
 try {
     $query = "
-        SELECT s.student_num, s.Fname, s.balance, s.transaction_limit
+        SELECT s.student_num, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(s.first_name, ''), NULLIF(s.last_name, ''))), ''), s.Fname) AS Fname, s.balance, s.transaction_limit
         FROM students s
         INNER JOIN parent_student_link psl ON s.student_num = psl.student_num
         WHERE psl.parent_id = ?

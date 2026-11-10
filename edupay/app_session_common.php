@@ -32,7 +32,6 @@ function as_device_id_hash(string $deviceId): string
     return hash('sha256', as_normalize_device_id($deviceId));
 }
 
-/** @return array{token:string,hash:string} */
 function as_new_session_token(): array
 {
     $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
@@ -95,7 +94,6 @@ function as_reject_session(string $code, string $message): void
     pc_reject($message, ['code' => $code]);
 }
 
-/** @param array<string, mixed> $session */
 function as_assert_session_identity(
     array $session,
     string $role,
@@ -118,10 +116,6 @@ function as_assert_session_identity(
     }
 }
 
-/**
- * @param array<string, mixed> $session
- * @param list<string> $allowedRoles
- */
 function as_assert_session_role(array $session, array $allowedRoles): void
 {
     if (!in_array((string)$session['role'], $allowedRoles, true)) {
@@ -143,7 +137,6 @@ function as_assert_tables(mysqli $conn): void
     }
 }
 
-/** @param array<string, mixed> $config */
 function as_request_ip_hash(array $config): string
 {
     $address = trim((string)($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
@@ -198,7 +191,6 @@ function as_utf8_truncate(string $value, int $maximumBytes): string
     return $truncated;
 }
 
-/** @return mixed */
 function as_sanitize_metadata_value($value, string $key = '', int $depth = 0)
 {
     if ($key !== ''
@@ -239,7 +231,6 @@ function as_sanitize_metadata_value($value, string $key = '', int $depth = 0)
     return as_utf8_truncate((string)$value, 500);
 }
 
-/** @param mixed $metadata */
 function as_metadata_json($metadata): ?string
 {
     if ($metadata === null || $metadata === '' || $metadata === []) {
@@ -266,10 +257,6 @@ function as_metadata_json($metadata): ?string
     return $encoded;
 }
 
-/**
- * @param array<string, mixed> $session
- * @param mixed $metadata
- */
 function as_record_activity(
     mysqli $conn,
     array $session,
@@ -326,12 +313,15 @@ function as_record_activity(
     return $eventId;
 }
 
-/**
- * Issue inside the caller's database transaction.
- *
- * @param array<string, mixed> $config
- * @return array{session_token:string,session_expires_at:string,session_expires_in:int,expires_in:int,session_idle_timeout_seconds:int,session_idle_expires_at:string,session_idle_expires_in:int,session_id:int}
- */
+function as_record_security_attempt(mysqli $conn, string $role, string $source, string $userId, string $type): void
+{
+    if (!pc_table_exists($conn, 'admin_security_attempts')) return;
+    $statement = pc_prepare($conn, 'INSERT INTO admin_security_attempts (account_role, account_source, user_id, attempt_type) VALUES (?, ?, ?, ?)');
+    $statement->bind_param('ssss', $role, $source, $userId, $type);
+    $statement->execute();
+    $statement->close();
+}
+
 function as_issue_session(
     mysqli $conn,
     array $config,
@@ -507,10 +497,6 @@ function as_issue_session(
     ];
 }
 
-/**
- * @param array<string, mixed> $issued
- * @return array{session_token:string,session_expires_at:string,session_expires_in:int,expires_in:int,session_idle_timeout_seconds:int,session_idle_expires_at:string,session_idle_expires_in:int}
- */
 function as_public_session_payload(array $issued): array
 {
     return [
@@ -524,7 +510,6 @@ function as_public_session_payload(array $issued): array
     ];
 }
 
-/** @param array<string, mixed> $session */
 function as_mark_session_revoked(
     mysqli $conn,
     array $session,
@@ -572,7 +557,6 @@ function as_mark_session_revoked(
     );
 }
 
-/** @return array<string, mixed> */
 function as_require_session(mysqli $conn, bool $touch = true): array
 {
     as_require_secure_transport();
@@ -627,9 +611,6 @@ function as_require_session(mysqli $conn, bool $touch = true): array
     $role = (string)$row['role'];
     $accountSource = (string)$row['account_source'];
     $userId = (string)$row['user_id'];
-    // Keep the same account-then-session-claim lock order used by login
-    // issuance. FOR UPDATE on the claim makes an in-flight replacement finish
-    // before this request is authorized.
     $config = pc_security_config();
     $account = pc_fetch_account_from_source_for_update($conn, $role, $userId, $accountSource);
     if ($account === null) {

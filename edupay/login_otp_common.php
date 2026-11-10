@@ -21,7 +21,6 @@ function lo_require_secure_transport(): void
     pc_reject('Login requires a secure HTTPS connection.');
 }
 
-/** @param array<string, mixed> $config */
 function lo_remote_ip_hash(array $config): string
 {
     $address = trim((string)($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
@@ -151,7 +150,15 @@ function lo_normalize_login_id(string $value): string
     return $normalized;
 }
 
-/** @return array<string, mixed>|null */
+function lo_display_name_expression(mysqli $conn, string $table): string
+{
+    if (pc_column_exists($conn, $table, 'first_name')
+        && pc_column_exists($conn, $table, 'last_name')) {
+        return "COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(first_name, ''), NULLIF(last_name, ''))), ''), Fname)";
+    }
+    return 'Fname';
+}
+
 function lo_find_login_account(mysqli $conn, string $loginId): ?array
 {
     $queries = [];
@@ -159,8 +166,9 @@ function lo_find_login_account(mysqli $conn, string $loginId): ?array
         $passwordChanged = pc_column_exists($conn, 'students', 'password_changed')
             ? 'password_changed'
             : '1 AS password_changed';
+        $studentName = lo_display_name_expression($conn, 'students');
         $queries[] = [
-            'sql' => "SELECT student_num AS id, Fname AS name, Password AS password_value, "
+            'sql' => "SELECT student_num AS id, $studentName AS name, Password AS password_value, "
                 . "$passwordChanged, 'student' AS app_role, 'students' AS account_source "
                 . 'FROM students WHERE student_num = ? LIMIT 1',
             'types' => 's',
@@ -171,8 +179,9 @@ function lo_find_login_account(mysqli $conn, string $loginId): ?array
         $passwordChanged = pc_column_exists($conn, 'parents', 'password_changed')
             ? 'password_changed'
             : '1 AS password_changed';
+        $parentName = lo_display_name_expression($conn, 'parents');
         $queries[] = [
-            'sql' => "SELECT parent_id AS id, Fname AS name, Password AS password_value, "
+            'sql' => "SELECT parent_id AS id, $parentName AS name, Password AS password_value, "
                 . "$passwordChanged, 'parent' AS app_role, 'parents' AS account_source "
                 . 'FROM parents WHERE parent_id = ? LIMIT 1',
             'types' => 's',
@@ -180,11 +189,12 @@ function lo_find_login_account(mysqli $conn, string $loginId): ?array
         ];
     }
     if (pc_table_exists($conn, 'admins')) {
+        $adminName = lo_display_name_expression($conn, 'admins');
         $roleExpression = pc_column_exists($conn, 'admins', 'role')
             ? "CASE WHEN LOWER(COALESCE(role, '')) = 'cashier' THEN 'cashier' ELSE 'admin' END"
             : "'admin'";
         $queries[] = [
-            'sql' => "SELECT admin_id AS id, Fname AS name, password AS password_value, "
+            'sql' => "SELECT admin_id AS id, $adminName AS name, password AS password_value, "
                 . "1 AS password_changed, $roleExpression AS app_role, 'admins' AS account_source "
                 . 'FROM admins WHERE username = ? OR admin_id = ? LIMIT 1',
             'types' => 'ss',
@@ -192,8 +202,9 @@ function lo_find_login_account(mysqli $conn, string $loginId): ?array
         ];
     }
     if (pc_table_exists($conn, 'cashiers')) {
+        $cashierName = lo_display_name_expression($conn, 'cashiers');
         $queries[] = [
-            'sql' => "SELECT cashier_id AS id, Fname AS name, password AS password_value, "
+            'sql' => "SELECT cashier_id AS id, $cashierName AS name, password AS password_value, "
                 . "1 AS password_changed, 'cashier' AS app_role, 'cashiers' AS account_source "
                 . 'FROM cashiers WHERE cashier_id = ? OR username = ? LIMIT 1',
             'types' => 'ss',
@@ -201,8 +212,9 @@ function lo_find_login_account(mysqli $conn, string $loginId): ?array
         ];
     }
     if (pc_table_exists($conn, 'canteens')) {
+        $canteenName = lo_display_name_expression($conn, 'canteens');
         $queries[] = [
-            'sql' => "SELECT canteen_id AS id, Fname AS name, Password AS password_value, "
+            'sql' => "SELECT canteen_id AS id, $canteenName AS name, Password AS password_value, "
                 . "1 AS password_changed, 'canteen' AS app_role, 'canteens' AS account_source "
                 . 'FROM canteens WHERE canteen_id = ? LIMIT 1',
             'types' => 's',
@@ -226,7 +238,6 @@ function lo_find_login_account(mysqli $conn, string $loginId): ?array
     return null;
 }
 
-/** @return list<string> */
 function lo_available_methods(
     mysqli $conn,
     string $role,
@@ -263,7 +274,6 @@ function lo_available_methods(
     return $methods;
 }
 
-/** @param array<string, mixed> $config */
 function lo_email_destination(
     mysqli $conn,
     array $config,
@@ -284,7 +294,6 @@ function lo_email_destination(
     ];
 }
 
-/** @param array<string, mixed> $config */
 function lo_send_email_code(
     array $config,
     string $destination,
@@ -307,7 +316,6 @@ function lo_send_email_code(
     );
 }
 
-/** @return array<string, mixed>|null */
 function lo_challenge_for_update(mysqli $conn, string $tokenHash): ?array
 {
     $statement = pc_prepare(
@@ -366,7 +374,6 @@ function lo_record_failed_attempt(mysqli $conn, int $challengeId, int $attempts)
     return max(0, LO_MAX_ATTEMPTS - $next);
 }
 
-/** @return array<string, mixed> */
 function lo_login_payload(
     mysqli $conn,
     string $role,
@@ -377,6 +384,7 @@ function lo_login_payload(
     $passwordChanged = pc_column_exists($conn, $target['table'], 'password_changed')
         ? 'password_changed'
         : '1 AS password_changed';
+    $displayName = lo_display_name_expression($conn, $target['table']);
     $rolePredicate = '';
     if ($target['table'] === 'admins' && pc_column_exists($conn, 'admins', 'role')) {
         $rolePredicate = $role === 'cashier'
@@ -384,8 +392,9 @@ function lo_login_payload(
             : " AND LOWER(COALESCE(role, '')) <> 'cashier'";
     }
     $sql = sprintf(
-        'SELECT `%s` AS id, Fname AS name, %s FROM `%s` WHERE `%s` = ?%s LIMIT 1',
+        'SELECT `%s` AS id, %s AS name, %s FROM `%s` WHERE `%s` = ?%s LIMIT 1',
         $target['id_field'],
+        $displayName,
         $passwordChanged,
         $target['table'],
         $target['id_field'],

@@ -257,6 +257,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
         ),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
+          ...await AppSessionService.instance.authorizationHeaders,
         },
         body: {
           'parent_id': widget.id,

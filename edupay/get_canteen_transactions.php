@@ -67,7 +67,7 @@ $txn_stmt = $conn->prepare("
     SELECT
         t.transaction_id,
         t.student_num,
-        s.Fname AS student_name,
+        COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(s.first_name, ''), NULLIF(s.last_name, ''))), ''), s.Fname) AS student_name,
         t.amount,
         COALESCE(t.description, 'Payment') AS description,
         COALESCE(t.date_time, t.date_created, NOW()) AS event_time

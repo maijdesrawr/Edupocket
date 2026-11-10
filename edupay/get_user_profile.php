@@ -44,7 +44,14 @@ if (!ensure_profile_photo_column($conn, $table)) {
     ]);
 }
 
-$sql = "SELECT `$id_field` AS id, `$name_field` AS name, profile_photo "
+$nameExpression = "`$name_field`";
+$firstCheck = $conn->query("SHOW COLUMNS FROM `$table` LIKE 'first_name'");
+$lastCheck = $conn->query("SHOW COLUMNS FROM `$table` LIKE 'last_name'");
+if ($firstCheck && $lastCheck && $firstCheck->num_rows > 0 && $lastCheck->num_rows > 0) {
+    $nameExpression = "COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(first_name, ''), NULLIF(last_name, ''))), ''), `$name_field`)";
+}
+
+$sql = "SELECT `$id_field` AS id, $nameExpression AS name, profile_photo "
     . "FROM `$table` WHERE `$id_field` = ? LIMIT 1";
 $stmt = $conn->prepare($sql);
 if (!$stmt) {

@@ -85,6 +85,8 @@ try {
     $cashier_account_stmt->close();
 
     if (!pin_matches($pin, $cashier['pin'] ?? '')) {
+        as_record_security_attempt($conn, 'cashier', 'cashiers', $cashier_id, 'topup_pin');
+        $conn->commit();
         throw new Exception('Invalid cashier PIN');
     }
 

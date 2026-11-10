@@ -36,7 +36,7 @@ $limitPeriodSelect = $hasTransactionLimitPeriod
 $children_query = $conn->prepare("
     SELECT DISTINCT
         s.student_num AS child_id,
-        s.Fname AS child_name,
+        COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(s.first_name, ''), NULLIF(s.last_name, ''))), ''), s.Fname) AS child_name,
         s.balance,
         MAX(COALESCE(s.is_frozen, 0)) AS is_frozen,
         $limitAmountSelect,
@@ -49,7 +49,7 @@ $children_query = $conn->prepare("
     INNER JOIN students s ON l.student_num = s.student_num
     LEFT JOIN transactions t ON s.student_num = t.student_num
     WHERE l.parent_id = ?
-    GROUP BY s.student_num, s.Fname, s.balance
+    GROUP BY s.student_num, s.Fname, s.first_name, s.last_name, s.balance
 ");
 $children_query->bind_param('s', $parent_id);
 $children_query->execute();
@@ -74,7 +74,7 @@ $activity_query = $conn->prepare("
     SELECT
         t.transaction_id,
         s.student_num AS child_id,
-        COALESCE(NULLIF(TRIM(s.Fname), ''), s.student_num) AS name,
+        COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(s.first_name, ''), NULLIF(s.last_name, ''))), ''), NULLIF(TRIM(s.Fname), ''), s.student_num) AS name,
         t.transaction_type,
         t.amount,
         COALESCE(t.date_time, t.date_created, NOW()) AS event_time,

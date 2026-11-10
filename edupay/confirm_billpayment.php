@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 include 'db_connect.php'; 
+require_once __DIR__ . '/app_session_common.php';
 
 function column_exists(mysqli $conn, string $table, string $column): bool {
     $safeTable = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
@@ -130,6 +131,7 @@ $current_balance = floatval($row['balance']);
 $stored_pin = $row['pin'];
 
 if (!pin_matches($pin, $stored_pin)) {
+    as_record_security_attempt($conn, 'student', 'students', (string)$student_id, 'payment_pin');
     echo json_encode([
         "status" => "error",
         "message" => "Invalid PIN"

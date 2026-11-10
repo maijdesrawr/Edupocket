@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 include 'db_connect.php';
+require_once __DIR__ . '/receipt_common.php';
 
 date_default_timezone_set('Asia/Manila');
 
@@ -13,7 +14,7 @@ if (empty($parent_id)) {
 }
 
 $childQuery = $conn->prepare("
-    SELECT s.student_num, s.Fname AS child_name
+    SELECT s.student_num, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(s.first_name, ''), NULLIF(s.last_name, ''))), ''), s.Fname) AS child_name
     FROM students s
     INNER JOIN parent_student_link psl ON s.student_num = psl.student_num
     WHERE psl.parent_id = ?
@@ -61,7 +62,10 @@ while ($row = $txResult->fetch_assoc()) {
         'amount' => (string)($row['amount'] ?? '0'),
         'date' => (string)($row['date'] ?? ''),
         'timestamp' => (string)($row['date'] ?? ''),
-        'note' => $row['note'] ?? ucfirst($row['transaction_type']),
+        'note' => receipt_transfer_detail_without_middle(
+            $conn,
+            (string)($row['note'] ?? ucfirst($row['transaction_type']))
+        ),
         'is_topup' => strtolower($row['transaction_type']) === 'top-up', 
     ];
 }

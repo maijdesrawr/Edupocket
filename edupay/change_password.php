@@ -3,9 +3,6 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 
-// Flutter Web sends the app-session token in the Authorization header. That
-// header triggers a browser CORS preflight, which must finish before any
-// database/session work is performed.
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Authorization, Content-Type");
@@ -59,7 +56,6 @@ $id = post_string('id');
 $role = strtolower(post_string('role'));
 $currentPassword = post_string('current_password');
 $newPassword = post_string('password');
-$newPin = post_string('pin');
 
 
 if (empty($id) || empty($role) || empty($currentPassword) || empty($newPassword)) {
@@ -92,15 +88,6 @@ if (!$strongPassword) {
 
 if (hash_equals($currentPassword, $newPassword)) {
     respond("error", "New password must be different from the temporary password");
-}
-
-if ($role === 'student') {
-    if (!preg_match('/^\d{6}$/', $newPin) || preg_match('/^(\d)\1{5}$/', $newPin)) {
-        respond(
-            "error",
-            "PIN must be exactly 6 digits and cannot contain repeating numbers"
-        );
-    }
 }
 
 if (!$conn->begin_transaction()) {
@@ -149,13 +136,9 @@ try {
 }
 
 
-// Hash the new permanent password
 $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
-$hashedPin = $role === 'student'
-    ? password_hash($newPin, PASSWORD_DEFAULT)
-    : null;
 
-if (!is_string($hashedPassword) || ($role === 'student' && !is_string($hashedPin))) {
+if (!is_string($hashedPassword)) {
     $conn->rollback();
     $conn->close();
     respond("error", "Unable to secure the new credentials");
@@ -170,7 +153,7 @@ switch ($role) {
 
         $stmt = $conn->prepare(
             "UPDATE students 
-            SET Password = ?, pin = ?, password_changed = TRUE
+            SET Password = ?, password_changed = TRUE
             WHERE student_num = ? AND password_changed = FALSE"
         );
 
@@ -181,12 +164,7 @@ switch ($role) {
             respond("error", "Unable to update credentials");
         }
 
-        $stmt->bind_param(
-            "sss",
-            $hashedPassword,
-            $hashedPin,
-            $id
-        );
+        $stmt->bind_param("ss", $hashedPassword, $id);
 
         break;
 
@@ -258,7 +236,7 @@ as_record_activity(
     $conn,
     $appSession,
     'initial_password_changed',
-    ['role' => $role, 'pin_created' => $role === 'student'],
+    ['role' => $role],
     'server'
 );
 as_mark_session_revoked($conn, $appSession, 'password_changed');

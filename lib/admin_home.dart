@@ -3,13 +3,13 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 import 'admin_profile.dart';
 import 'admin_report.dart';
 import 'admin_users.dart';
 import 'api_config.dart';
-import 'receipt_action.dart';
 import 'app_session_service.dart';
 import 'profile_avatar.dart';
 
@@ -29,7 +29,14 @@ class _AdminHomeState extends State<AdminHome> {
   static const Color _softRed = Color(0xFFD6322D);
   static const Color _cardShadow = Color(0x33000000);
   static const Color _mutedText = Color(0xFF8B8B8B);
-  static const Color _successGreen = Color(0xFF139B2E);
+  static const List<Color> _chartColors = [
+    Color(0xFF7773E8),
+    Color(0xFF53C5AE),
+    Color(0xFFFF978E),
+    Color(0xFFF2B44A),
+  ];
+  static const MethodChannel _exportChannel =
+      MethodChannel('edupocket/admin_exports');
 
   int _selectedIndex = 0;
   int _totalUsers = 0;
@@ -43,7 +50,15 @@ class _AdminHomeState extends State<AdminHome> {
   };
   double _totalBalance = 0.0;
   bool _isLoading = true;
-  List<dynamic> _activities = [];
+  List<dynamic> _canteenSales = [];
+  List<dynamic> _cashierSales = [];
+  List<dynamic> _needsAttention = [];
+  List<dynamic> _systemSecurity = [];
+  String _period = 'all';
+  String _sort = 'sales';
+  DateTime? _customStart;
+  DateTime? _customEnd;
+  bool _showCashierSales = false;
 
   @override
   void initState() {
@@ -61,9 +76,15 @@ class _AdminHomeState extends State<AdminHome> {
     setState(() => _isLoading = true);
 
     try {
-      final response = await http.get(
-        Uri.parse(ApiConfig.url('get_admin_dashboard.php')),
-      );
+      final query = <String, String>{'period': _period, 'sort': _sort};
+      if (_period == 'custom' && _customStart != null && _customEnd != null) {
+        query['start_date'] = _dateKey(_customStart!);
+        query['end_date'] = _dateKey(_customEnd!);
+      }
+      final uri = Uri.parse(ApiConfig.url('get_admin_dashboard.php'))
+          .replace(queryParameters: query);
+      final response = await http.get(uri,
+          headers: AppSessionService.instance.authorizationHeaders);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -85,7 +106,12 @@ class _AdminHomeState extends State<AdminHome> {
           }
           _totalBalance =
               double.tryParse(data['total_balance'].toString()) ?? 0.0;
-          _activities = List<dynamic>.from(data['activities'] ?? const []);
+          _canteenSales = List<dynamic>.from(data['canteen_sales'] ?? const []);
+          _cashierSales = List<dynamic>.from(data['cashier_sales'] ?? const []);
+          _needsAttention =
+              List<dynamic>.from(data['needs_attention'] ?? const []);
+          _systemSecurity =
+              List<dynamic>.from(data['system_security'] ?? const []);
           _isLoading = false;
         });
         return;
@@ -214,72 +240,22 @@ class _AdminHomeState extends State<AdminHome> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'Quick Actions',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildQuickActionCard(
-                              icon: Icons.group_add_outlined,
-                              label: 'Manage Users',
-                              onTap: () => _onNavTap(1),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildQuickActionCard(
-                              icon: Icons.query_stats_outlined,
-                              label: 'View Reports',
-                              onTap: () => _onNavTap(2),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              'Recent Activity',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(18),
-                            onTap: () => _onNavTap(2),
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              child: Text(
-                                'View All',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 17),
                       Expanded(
-                        child: _buildRecentActivitySection(),
-                      ),
+                          child: ListView(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        children: [
+                          _buildSalesSection(),
+                          const SizedBox(height: 16),
+                          _sectionTitle('Needs attention'),
+                          const SizedBox(height: 9),
+                          _buildNeedsAttention(),
+                          const SizedBox(height: 16),
+                          _sectionTitle('Account Freeze & Deletion'),
+                          const SizedBox(height: 9),
+                          _buildAccountChanges(),
+                        ],
+                      )),
                     ],
                   ),
                 ),
@@ -291,6 +267,540 @@ class _AdminHomeState extends State<AdminHome> {
       bottomNavigationBar: _buildBottomNav(),
     );
   }
+
+  static String _dateKey(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  Widget _sectionTitle(String title) => Text(title,
+      style: const TextStyle(
+          color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold));
+
+  Future<void> _chooseCustomDates() async {
+    final range = await showDialog<DateTimeRange>(
+      context: context,
+      builder: (context) => _AdminDateRangePicker(
+        initialRange: _customStart != null && _customEnd != null
+            ? DateTimeRange(start: _customStart!, end: _customEnd!)
+            : null,
+      ),
+    );
+    if (range == null || !mounted) return;
+    setState(() {
+      _customStart = range.start;
+      _customEnd = range.end;
+      _period = 'custom';
+    });
+    fetchDashboardData();
+  }
+
+  Widget _buildSalesSection() {
+    final rows = _showCashierSales ? _cashierSales : _canteenSales;
+    final chartRows = rows.take(10).toList();
+    final values = chartRows.map((raw) {
+      return _salesMetric(Map<String, dynamic>.from(raw as Map));
+    }).toList();
+    final maxMetric = values.fold<double>(0, math.max);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Sales Performance',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: DropdownButton<String>(
+              value: _sort,
+              underline: const SizedBox(),
+              isDense: true,
+              items: const [
+                DropdownMenuItem(value: 'sales', child: Text('Highest Sales')),
+                DropdownMenuItem(
+                  value: 'transactions',
+                  child: Text('Most Transactions'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() => _sort = value);
+                fetchDashboardData();
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 9),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: 42,
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Row(
+                  children: [
+                    for (final filter in const [
+                      ('all', 'All time'),
+                      ('today', 'Today'),
+                      ('week', 'Weekly'),
+                      ('month', 'Monthly'),
+                    ])
+                      Expanded(
+                        child: _periodButton(filter.$1, filter.$2),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 7),
+            SizedBox.square(
+              dimension: 42,
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  tooltip: 'Choose date range',
+                  onPressed: _chooseCustomDates,
+                  icon: Icon(
+                    Icons.calendar_month,
+                    size: 19,
+                    color: _period == 'custom' ? _deepRed : _primaryRed,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_period == 'custom' && _customStart != null && _customEnd != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              '${_dateKey(_customStart!)} - ${_dateKey(_customEnd!)}',
+              style: const TextStyle(color: Colors.white70, fontSize: 11),
+            ),
+          ),
+        const SizedBox(height: 9),
+        Container(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    _showCashierSales ? 'By Cashier' : 'By Canteen',
+                    style: const TextStyle(
+                      color: _primaryRed,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => setState(
+                      () => _showCashierSales = !_showCashierSales,
+                    ),
+                    child: Text(
+                      _showCashierSales ? 'View Canteens' : 'View Cashiers',
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Export sales table',
+                    onPressed: () => _confirmExportSalesTable(rows),
+                    icon: const Icon(
+                      Icons.table_chart_outlined,
+                      color: _primaryRed,
+                    ),
+                  ),
+                ],
+              ),
+              if (chartRows.isEmpty)
+                const SizedBox(
+                  height: 140,
+                  child: Center(
+                    child: Text(
+                      'No sales for this period.',
+                      style: TextStyle(color: Colors.black54),
+                    ),
+                  ),
+                )
+              else ...[
+                SizedBox(
+                  height: 160,
+                  width: double.infinity,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: _HorizontalSalesPainter(
+                            maximum: maxMetric,
+                            sortByTransactions: _sort == 'transactions',
+                          ),
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 8, 8, 25),
+                          child: Column(
+                            children: List.generate(chartRows.length, (index) {
+                              final item = Map<String, dynamic>.from(
+                                  chartRows[index] as Map);
+                              final sales =
+                                  double.tryParse('${item['sales']}') ?? 0;
+                              final transactions =
+                                  int.tryParse('${item['payment_count']}') ?? 0;
+                              final fraction = maxMetric > 0
+                                  ? (values[index] / maxMetric)
+                                      .clamp(0.025, 1.0)
+                                      .toDouble()
+                                  : 0.025;
+                              final transactionLabel = transactions == 1
+                                  ? '1 transaction'
+                                  : '$transactions transactions';
+                              return Expanded(
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: FractionallySizedBox(
+                                    widthFactor: fraction,
+                                    child: Tooltip(
+                                      triggerMode: TooltipTriggerMode.longPress,
+                                      message:
+                                          '${item['name']}\nTotal sales: ${_formatMoney(sales)}\nTotal transactions: $transactionLabel',
+                                      child: Container(
+                                        height: 14,
+                                        decoration: BoxDecoration(
+                                          color: _chartColors[
+                                              index % _chartColors.length],
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    for (var i = 0; i < chartRows.length; i++)
+                      _salesLegendItem(chartRows[i], i),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 5),
+          child: Text(
+            '${rows.length} registered ${_showCashierSales ? 'cashiers' : 'canteens'} - chart shows top 10',
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
+          ),
+        ),
+      ],
+    );
+  }
+
+  double _salesMetric(Map<String, dynamic> row) => _sort == 'transactions'
+      ? (double.tryParse('${row['payment_count']}') ?? 0)
+      : (double.tryParse('${row['sales']}') ?? 0);
+
+  Widget _periodButton(String period, String label) {
+    final selected = _period == period;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: SizedBox(
+        height: 32,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () {
+            setState(() => _period = period);
+            fetchDashboardData();
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+            decoration: BoxDecoration(
+              color: selected ? _deepRed : const Color(0xFFF3B6AA),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: selected ? Colors.white : _primaryRed,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _salesLegendItem(dynamic raw, int index) {
+    final row = Map<String, dynamic>.from(raw as Map);
+    final sales = double.tryParse('${row['sales']}') ?? 0;
+    final count = int.tryParse('${row['payment_count']}') ?? 0;
+    final transactionLabel =
+        count == 1 ? '1 transaction' : '$count transactions';
+    return SizedBox(
+      width: 145,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 3),
+            child: Container(
+              width: 8,
+              height: 8,
+              color: _chartColors[index % _chartColors.length],
+            ),
+          ),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              '${row['name'] ?? ''}\n${_formatMoney(sales)} / $transactionLabel',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 9, height: 1.2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmExportSalesTable(List<dynamic> rows) async {
+    final category = _showCashierSales ? 'Cashier' : 'Canteen';
+    final ranking =
+        _sort == 'transactions' ? 'most transactions' : 'highest sales';
+    final filter = switch (_period) {
+      'today' => 'Today',
+      'week' => 'Weekly',
+      'month' => 'Monthly',
+      'year' => 'Yearly',
+      'custom' when _customStart != null && _customEnd != null =>
+        '${_dateKey(_customStart!)} to ${_dateKey(_customEnd!)}',
+      _ => 'All time',
+    };
+    final title = '$category $ranking ($filter)';
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Export sales table?'),
+        content: Text('Export "$title" as a CSV file?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Export'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    String csvField(String value) => '"${value.replaceAll('"', '""')}"';
+    final csv = StringBuffer()
+      ..writeln(csvField(title))
+      ..writeln()
+      ..writeln('Name,Total Sales,Total transactions');
+    for (final raw in rows) {
+      final row = Map<String, dynamic>.from(raw as Map);
+      csv.writeln([
+        csvField('${row['name'] ?? ''}'),
+        csvField(_formatMoney(double.tryParse('${row['sales']}') ?? 0)),
+        csvField('${row['payment_count'] ?? 0}'),
+      ].join(','));
+    }
+
+    try {
+      final fileName = '${category}_${_period}_${_sort}.csv'
+          .replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
+      await _exportChannel.invokeMethod<String>('exportCsv', {
+        'title': title,
+        'fileName': fileName,
+        'csv': csv.toString(),
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('CSV saved to Downloads and ready to share.'),
+        ));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not export the sales table.'),
+        ));
+      }
+    }
+  }
+
+  Widget _buildNeedsAttention() {
+    if (_needsAttention.isEmpty)
+      return _whiteMessage('No alerts need attention.');
+    return Column(
+        children: _needsAttention.map((dynamic raw) {
+      final alert = Map<String, dynamic>.from(raw as Map);
+      return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+              boxShadow: const [
+                BoxShadow(
+                    color: _cardShadow, blurRadius: 8, offset: Offset(0, 3))
+              ]),
+          child: Row(children: [
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text('${alert['label'] ?? 'Security alert'}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 13)),
+                  Text('${alert['name'] ?? 'Account holder'}',
+                      style:
+                          const TextStyle(color: Colors.black54, fontSize: 11)),
+                  Text('${alert['last_at'] ?? ''}',
+                      style:
+                          const TextStyle(color: Colors.black38, fontSize: 9))
+                ])),
+            IconButton(
+                tooltip: 'Email alert',
+                style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFD6D2)),
+                onPressed: () => _confirmSendAlert(alert),
+                icon: const Icon(Icons.mail_outline, color: Colors.red))
+          ]));
+    }).toList());
+  }
+
+  Future<void> _confirmSendAlert(Map<String, dynamic> alert) async {
+    final shouldSend = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+                title: const Text('Send email alert?'),
+                content: Text(
+                    'Send the security alert email to ${alert['name'] ?? 'this account holder'}?'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(dialogContext, false),
+                      child: const Text('No')),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(dialogContext, true),
+                      child: const Text('Send email'))
+                ]));
+    if (shouldSend != true || !mounted) return;
+    try {
+      final response = await http.post(
+          Uri.parse(ApiConfig.url('send_admin_security_alert.php')),
+          headers: {
+            'Content-Type': 'application/json',
+            ...AppSessionService.instance.authorizationHeaders
+          },
+          body: json.encode({
+            'type': alert['type'],
+            'role': alert['role'],
+            'source': alert['source'],
+            'user_id': alert['user_id']
+          }));
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 && data['status'] == 'success') {
+        if (!mounted) return;
+        setState(() => _needsAttention.removeWhere((raw) {
+              final item = Map<String, dynamic>.from(raw as Map);
+              return item['type'] == alert['type'] &&
+                  item['role'] == alert['role'] &&
+                  item['source'] == alert['source'] &&
+                  item['user_id'] == alert['user_id'];
+            }));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Email alert sent.')));
+      } else if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(data['message']?.toString() ??
+                'Could not send the email alert.')));
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not send the email alert.')));
+    }
+  }
+
+  Widget _buildAccountChanges() => _systemSecurity.isEmpty
+      ? _whiteMessage('No recent account freezes or deletions.')
+      : Column(
+          children: _systemSecurity.map((dynamic raw) {
+          final item = Map<String, dynamic>.from(raw as Map);
+          return Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+              decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: const [
+                    BoxShadow(
+                        color: _cardShadow, blurRadius: 7, offset: Offset(0, 2))
+                  ]),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${item['title'] ?? 'Account change'}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(height: 3),
+                    Text('${item['created_at'] ?? ''}',
+                        style: const TextStyle(
+                            color: Colors.black38, fontSize: 10))
+                  ]));
+        }).toList());
+
+  Widget _whiteMessage(String text) => Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+          color: Colors.white, borderRadius: BorderRadius.circular(14)),
+      child: Text(text, style: const TextStyle(color: Colors.black54)));
 
   Widget _buildHeroAvatar() {
     return ProfileAvatar(
@@ -445,177 +955,6 @@ class _AdminHomeState extends State<AdminHome> {
     );
   }
 
-  Widget _buildQuickActionCard({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.white,
-      elevation: 4,
-      shadowColor: Colors.black26,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-          child: Column(
-            children: [
-              Icon(icon, color: _primaryRed, size: 20),
-              const SizedBox(height: 6),
-              SizedBox(
-                height: 22,
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.black87,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecentActivitySection() {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.white),
-      );
-    }
-
-    if (_activities.isEmpty) {
-      return Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withAlpha(20),
-              spreadRadius: 1,
-              blurRadius: 8,
-            ),
-          ],
-        ),
-        child: const Center(
-          child: Text(
-            'No recent activity found',
-            style: TextStyle(
-              color: Colors.black54,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.only(bottom: 24),
-      itemCount: _activities.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        return _buildActivityCard(_activities[index] as Map<String, dynamic>);
-      },
-    );
-  }
-
-  Widget _buildActivityCard(Map<String, dynamic> activity) {
-    final amount = _activityAmountText(activity);
-    final isPositive = _activityIsPositive(activity);
-    final title = (activity['title'] ?? '').toString().trim();
-    final subtitle = _activitySubtitle(activity);
-    final timestamp = _activityTimestamp(activity);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withAlpha(20),
-            spreadRadius: 1,
-            blurRadius: 8,
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title.isEmpty ? 'Unknown User' : title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.black54,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  timestamp,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.black38,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                amount.isEmpty ? '\u20B10' : amount,
-                style: TextStyle(
-                  color: isPositive ? _successGreen : Colors.red,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 2),
-              ReceiptAction(
-                  transactionId: int.tryParse(
-                          (activity['transaction_id'] ?? '').toString()) ??
-                      0,
-                  viewerRole: 'admin',
-                  viewerId: widget.id),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildBottomNav() {
     return SafeArea(
       top: false,
@@ -694,84 +1033,290 @@ class _AdminHomeState extends State<AdminHome> {
     final prefix = value < 0 ? '-\u20B1 ' : '\u20B1 ';
     return '$prefix$formatted';
   }
+}
 
-  String _activitySubtitle(Map<String, dynamic> activity) {
-    final description =
-        (activity['description'] ?? activity['paymentTitle'] ?? '')
-            .toString()
-            .trim();
-    if (description.isNotEmpty && description.toLowerCase() != 'payment') {
-      return description;
-    }
+class _HorizontalSalesPainter extends CustomPainter {
+  final double maximum;
+  final bool sortByTransactions;
 
-    final raw = (activity['transaction_type'] ?? activity['subtitle'] ?? '')
-        .toString()
-        .trim();
-    if (raw.isEmpty) return 'Recent transaction';
+  const _HorizontalSalesPainter({
+    required this.maximum,
+    required this.sortByTransactions,
+  });
 
-    switch (raw.toLowerCase()) {
-      case 'top-up':
-        return 'Parent Top-up';
-      case 'payment':
-        return 'Payment';
-      default:
-        return raw;
+  @override
+  void paint(Canvas canvas, Size size) {
+    const left = 8.0;
+    const top = 8.0;
+    const axisHeight = 25.0;
+    final plotWidth = math.max(0.0, size.width - 16).toDouble();
+    final plotHeight = math.max(0.0, size.height - top - axisHeight).toDouble();
+    final scaleMax = maximum > 0 ? maximum : 1.0;
+    final gridPaint = Paint()
+      ..color = const Color(0xFFD9D9D9)
+      ..strokeWidth = 0.7;
+
+    for (var tick = 0; tick <= 4; tick++) {
+      final x = left + plotWidth * tick / 4;
+      canvas.drawLine(Offset(x, top), Offset(x, top + plotHeight), gridPaint);
+      final tickValue = scaleMax * tick / 4;
+      final label = sortByTransactions
+          ? tickValue.toStringAsFixed(0)
+          : '\u20B1${tickValue.toStringAsFixed(0)}';
+      final text = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: const TextStyle(color: Color(0xFF666666), fontSize: 9),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      text.paint(canvas, Offset(x - text.width / 2, top + plotHeight + 6));
     }
   }
 
-  String _activityTimestamp(Map<String, dynamic> activity) {
-    final raw = (activity['timestamp'] ?? activity['date_time'] ?? '')
-        .toString()
-        .trim();
-    if (raw.isEmpty) return 'Time unavailable';
+  @override
+  bool shouldRepaint(covariant _HorizontalSalesPainter oldDelegate) {
+    if (oldDelegate.maximum != maximum ||
+        oldDelegate.sortByTransactions != sortByTransactions) return true;
+    return false;
+  }
+}
 
-    final parsed = DateTime.tryParse(raw);
-    if (parsed == null) return raw;
+class _AdminDateRangePicker extends StatefulWidget {
+  final DateTimeRange? initialRange;
+  const _AdminDateRangePicker({this.initialRange});
+  @override
+  State<_AdminDateRangePicker> createState() => _AdminDateRangePickerState();
+}
 
-    final date =
-        '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}';
-    final hour = parsed.hour > 12
-        ? parsed.hour - 12
-        : (parsed.hour == 0 ? 12 : parsed.hour);
-    final minute = parsed.minute.toString().padLeft(2, '0');
-    final suffix = parsed.hour >= 12 ? 'PM' : 'AM';
-
-    return '$date \u2022 ${hour.toString().padLeft(2, '0')}:$minute $suffix';
+class _AdminDateRangePickerState extends State<_AdminDateRangePicker> {
+  static const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December'
+  ];
+  late DateTime visible;
+  DateTime? start, end;
+  bool chooseEnd = false;
+  static DateTime day(DateTime d) => DateTime(d.year, d.month, d.day);
+  @override
+  void initState() {
+    super.initState();
+    start =
+        widget.initialRange == null ? null : day(widget.initialRange!.start);
+    end = widget.initialRange == null ? null : day(widget.initialRange!.end);
+    final d = start ?? DateTime.now();
+    visible = DateTime(d.year, d.month);
   }
 
-  bool _activityIsPositive(Map<String, dynamic> activity) {
-    final type = (activity['transaction_type'] ?? activity['subtitle'] ?? '')
-        .toString()
-        .trim()
-        .toLowerCase();
-    if (type == 'top-up') return true;
-    if (type == 'payment') return false;
-
-    final rawAmount = (activity['amount'] ?? '').toString().trim();
-    return rawAmount.startsWith('+');
+  String fmt(DateTime? d) =>
+      d == null ? 'Select date' : '${months[d.month - 1]} ${d.day}, ${d.year}';
+  void pick(DateTime d) {
+    d = day(d);
+    setState(() {
+      if (!chooseEnd || start == null) {
+        start = d;
+        end = null;
+        chooseEnd = true;
+      } else if (d.isBefore(start!)) {
+        end = start;
+        start = d;
+        chooseEnd = false;
+      } else {
+        end = d;
+        chooseEnd = false;
+      }
+    });
   }
 
-  String _activityAmountText(Map<String, dynamic> activity) {
-    final rawAmount = activity['amount'];
-    double value;
+  Future<void> chooseMonthYear() async {
+    var m = visible.month, y = visible.year;
+    final d = await showDialog<DateTime>(
+        context: context,
+        builder: (c) => StatefulBuilder(
+            builder: (c, local) => AlertDialog(
+                    title: const Text('Select month and year'),
+                    content: Row(children: [
+                      Expanded(
+                          child: DropdownButtonFormField<int>(
+                              value: m,
+                              decoration:
+                                  const InputDecoration(labelText: 'Month'),
+                              items: List.generate(12, (i) => i + 1)
+                                  .map((v) => DropdownMenuItem(
+                                      value: v, child: Text(months[v - 1])))
+                                  .toList(),
+                              onChanged: (v) => local(() => m = v ?? m))),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: DropdownButtonFormField<int>(
+                              value: y,
+                              decoration:
+                                  const InputDecoration(labelText: 'Year'),
+                              items: List.generate(
+                                      101, (i) => DateTime.now().year - 50 + i)
+                                  .map((v) => DropdownMenuItem(
+                                      value: v, child: Text('$v')))
+                                  .toList(),
+                              onChanged: (v) => local(() => y = v ?? y)))
+                    ]),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(c),
+                          child: const Text('Cancel')),
+                      TextButton(
+                          onPressed: () => Navigator.pop(c, DateTime(y, m)),
+                          child: const Text('OK'))
+                    ])));
+    if (d != null && mounted) setState(() => visible = d);
+  }
 
-    if (rawAmount is num) {
-      value = rawAmount.toDouble();
-    } else {
-      final parsed =
-          rawAmount?.toString().replaceAll(RegExp(r'[^0-9.\-]'), '').trim() ??
-              '';
-      value = double.tryParse(parsed) ?? 0;
-    }
-
-    final fixed = value.abs().toStringAsFixed(2);
-    final parts = fixed.split('.');
-    final whole = parts[0].replaceAllMapped(
-      RegExp(r'\B(?=(\d{3})+(?!\d))'),
-      (_) => ',',
-    );
-    final formatted = '$whole.${parts[1]}';
-    final sign = _activityIsPositive(activity) ? '+' : '-';
-    return '$sign\u20B1$formatted';
+  @override
+  Widget build(BuildContext c) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 520,
+            maxHeight: MediaQuery.sizeOf(c).height * .82,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(children: [
+              Row(children: [
+                Expanded(child: header('From', start, !chooseEnd)),
+                Container(width: 1, height: 68, color: Colors.black12),
+                Expanded(child: header('To', end, chooseEnd)),
+              ]),
+              const Divider(height: 1),
+              Expanded(child: calendar()),
+              const Divider(height: 1),
+              Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                TextButton(
+                  style: TextButton.styleFrom(
+                      foregroundColor: _AdminHomeState._deepRed),
+                  onPressed: () => Navigator.pop(c),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _AdminHomeState._deepRed,
+                    foregroundColor: Colors.white,
+                    shape: const StadiumBorder(),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 28, vertical: 12),
+                  ),
+                  onPressed: start != null && end != null
+                      ? () => Navigator.pop(
+                          c, DateTimeRange(start: start!, end: end!))
+                      : null,
+                  child: const Text('Apply'),
+                ),
+              ]),
+            ]),
+          ),
+        ),
+      );
+  Widget header(String title, DateTime? date, bool active) => InkWell(
+      onTap: () => setState(() => chooseEnd = title == 'To'),
+      child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+          child: Column(children: [
+            Text(title,
+                style: TextStyle(
+                    color: active ? _AdminHomeState._deepRed : Colors.black54)),
+            const SizedBox(height: 4),
+            Text(fmt(date),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: active ? _AdminHomeState._deepRed : Colors.black87))
+          ])));
+  Widget calendar() {
+    final f = DateTime(visible.year, visible.month, 1),
+        first = f.subtract(Duration(days: f.weekday - 1)),
+        days = List.generate(42, (i) => first.add(Duration(days: i)));
+    return Column(children: [
+      SizedBox(
+          height: 52,
+          child: Row(children: [
+            IconButton(
+                onPressed: () => setState(
+                    () => visible = DateTime(visible.year, visible.month - 1)),
+                icon: const Icon(Icons.chevron_left)),
+            Expanded(
+                child: TextButton(
+                    onPressed: chooseMonthYear,
+                    child: Text('${months[visible.month - 1]}, ${visible.year}',
+                        style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87)))),
+            IconButton(
+                onPressed: () => setState(
+                    () => visible = DateTime(visible.year, visible.month + 1)),
+                icon: const Icon(Icons.chevron_right))
+          ])),
+      Row(
+          children: const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+              .map((v) => Expanded(
+                  child: Center(
+                      child: Text(v,
+                          style: TextStyle(
+                              color: _AdminHomeState._deepRed,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11)))))
+              .toList()),
+      const SizedBox(height: 4),
+      Expanded(
+          child: GridView.builder(
+              padding: EdgeInsets.zero,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: days.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 7, mainAxisExtent: 44),
+              itemBuilder: (c, i) {
+                final d = days[i],
+                    a = start != null && day(d) == start,
+                    b = end != null && day(d) == end,
+                    r = start != null &&
+                        end != null &&
+                        !d.isBefore(start!) &&
+                        !d.isAfter(end!),
+                    edge = a || b;
+                return InkWell(
+                    onTap: () => pick(d),
+                    child: Container(
+                        margin: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                            color: edge
+                                ? _AdminHomeState._deepRed
+                                : r
+                                    ? const Color(0xFFF4C1C1)
+                                    : Colors.transparent,
+                            borderRadius: BorderRadius.circular(edge ? 30 : 6)),
+                        alignment: Alignment.center,
+                        child: Text('${d.day}',
+                            style: TextStyle(
+                                fontSize: 13,
+                                color: edge
+                                    ? Colors.white
+                                    : d.month == visible.month
+                                        ? Colors.black87
+                                        : Colors.black38))));
+              }))
+    ]);
   }
 }

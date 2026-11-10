@@ -360,6 +360,7 @@ if ($is_frozen === 1) {
 
 $stored_pin = $student_row['pin'] ?? '';
 if (!pin_matches($pin, $stored_pin)) {
+    as_record_security_attempt($conn, 'student', 'students', $student_num, 'payment_pin');
     $failed_attempts++;
     $lock_profile = ($failed_attempts >= 3) ? 1 : 0;
 

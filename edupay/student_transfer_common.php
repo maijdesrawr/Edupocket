@@ -208,7 +208,7 @@ function st_lock_student(mysqli $conn, string $studentNumber): array
 
     $statement = st_prepare(
         $conn,
-        "SELECT student_num, Fname, balance, pin, {$failedAttempts}, {$isLocked}, "
+        "SELECT student_num, Fname, first_name, last_name, balance, pin, {$failedAttempts}, {$isLocked}, "
             . "{$isFrozen}, {$transactionLimit}, {$transactionLimitPeriod} "
             . 'FROM students WHERE student_num = ? LIMIT 1 FOR UPDATE'
     );
@@ -700,8 +700,10 @@ function st_execute_transfer(
             (string)($sender['transaction_limit_period'] ?? 'daily')
         );
 
-        $senderName = trim((string)$sender['Fname']);
-        $recipientName = trim((string)$recipient['Fname']);
+        $senderName = trim((string)($sender['first_name'] ?? '') . ' ' . (string)($sender['last_name'] ?? ''));
+        $recipientName = trim((string)($recipient['first_name'] ?? '') . ' ' . (string)($recipient['last_name'] ?? ''));
+        if ($senderName === '') $senderName = trim((string)$sender['Fname']);
+        if ($recipientName === '') $recipientName = trim((string)$recipient['Fname']);
         if ($senderName === '') {
             $senderName = $senderStudentNumber;
         }

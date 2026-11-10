@@ -245,6 +245,7 @@ try {
     $attempts = intval($student['failed_attempts'] ?? 0);
 
     if (!pin_matches($pin, $stored_pin)) {
+        as_record_security_attempt($conn, 'student', 'students', $student_num, 'payment_pin');
         if ($hasFailedAttempts && $hasIsLocked) {
             $attempts++;
 

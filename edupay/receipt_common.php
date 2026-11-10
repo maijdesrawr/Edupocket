@@ -103,6 +103,161 @@ function receipt_processed_by(array $transaction): array
     ];
 }
 
+function receipt_mask_student_name(string $name): string
+{
+    $normalized = trim((string)(preg_replace('/\s+/u', ' ', $name) ?? $name));
+    if ($normalized === '') {
+        return 'Unknown User';
+    }
+
+    $parts = preg_split('/\s+/u', $normalized, -1, PREG_SPLIT_NO_EMPTY);
+    if (!is_array($parts) || $parts === []) {
+        return 'Unknown User';
+    }
+
+    $initial = static function (string $part): string {
+        return function_exists('mb_substr')
+            ? mb_substr($part, 0, 1, 'UTF-8')
+            : (preg_match('/^./us', $part, $match) === 1
+                ? $match[0]
+                : substr($part, 0, 1));
+    };
+    $firstInitial = $initial((string)$parts[0]);
+
+    if (count($parts) === 1) {
+        return $firstInitial . '•••';
+    }
+
+    $maskedSurname = '';
+    foreach (array_slice($parts, 1) as $index => $part) {
+        $maskedSurname .= $initial((string)$part)
+            . str_repeat('•', $index === 0 ? 4 : 3);
+    }
+
+    return $firstInitial . '••• ' . $maskedSurname;
+}
+
+function receipt_mask_name_parts(string $firstName, string $lastName): string
+{
+    $firstName = trim($firstName);
+    $lastName = trim($lastName);
+    if ($firstName === '' || $lastName === '') {
+        return receipt_mask_student_name(trim($firstName . ' ' . $lastName));
+    }
+    $initial = static function (string $word): string {
+        return function_exists('mb_substr') ? mb_substr($word, 0, 1, 'UTF-8') : substr($word, 0, 1);
+    };
+    $maskedLast = '';
+    $words = preg_split('/\s+/u', $lastName, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    foreach ($words as $index => $word) {
+        $maskedLast .= $initial($word) . str_repeat('•', $index === 0 ? 4 : 3);
+    }
+    return $initial($firstName) . '••• ' . $maskedLast;
+}
+
+function receipt_mask_account_name(
+    mysqli $conn,
+    string $source,
+    string $id,
+    string $fallback
+): string {
+    $targets = ['students'=>'student_num','parents'=>'parent_id','admins'=>'admin_id','cashiers'=>'cashier_id','canteens'=>'canteen_id'];
+    if (!isset($targets[$source]) || !receipt_column_exists($conn, $source, 'first_name')
+        || !receipt_column_exists($conn, $source, 'last_name')) return receipt_mask_student_name($fallback);
+    $key = $targets[$source];
+    $st = receipt_prepare($conn, "SELECT first_name,last_name FROM `$source` WHERE `$key`=? LIMIT 1");
+    $st->bind_param('s', $id); $st->execute(); $row = $st->get_result()->fetch_assoc(); $st->close();
+    return is_array($row)
+        ? receipt_mask_name_parts((string)($row['first_name']??''),(string)($row['last_name']??''))
+        : receipt_mask_student_name($fallback);
+}
+
+function receipt_account_name_without_middle(
+    mysqli $conn,
+    string $source,
+    string $id,
+    string $fallback
+): string {
+    $targets = [
+        'students' => 'student_num', 'parents' => 'parent_id',
+        'admins' => 'admin_id', 'cashiers' => 'cashier_id', 'canteens' => 'canteen_id',
+    ];
+    if (!isset($targets[$source]) || !receipt_column_exists($conn, $source, 'first_name')
+        || !receipt_column_exists($conn, $source, 'last_name')) {
+        return trim($fallback);
+    }
+    $key = $targets[$source];
+    $statement = receipt_prepare(
+        $conn,
+        "SELECT TRIM(CONCAT_WS(' ', NULLIF(first_name, ''), NULLIF(last_name, ''))) AS display_name "
+            . "FROM `$source` WHERE `$key` = ? LIMIT 1"
+    );
+    $statement->bind_param('s', $id);
+    $statement->execute();
+    $row = $statement->get_result()->fetch_assoc();
+    $statement->close();
+    $name = trim((string)($row['display_name'] ?? ''));
+    return $name !== '' ? $name : trim($fallback);
+}
+
+function receipt_transfer_detail_without_middle(mysqli $conn, string $detail): string
+{
+    if (preg_match('/^(Transfer\\s+(?:sent\\s+to|received\\s+from)\\s+)(.+)$/iu', trim($detail), $matches) !== 1) {
+        return $detail;
+    }
+    $legacyName = trim($matches[2]);
+    $statement = receipt_prepare(
+        $conn,
+        "SELECT TRIM(CONCAT_WS(' ', NULLIF(first_name, ''), NULLIF(last_name, ''))) AS display_name "
+            . 'FROM students WHERE Fname = ? LIMIT 1'
+    );
+    $statement->bind_param('s', $legacyName);
+    $statement->execute();
+    $row = $statement->get_result()->fetch_assoc();
+    $statement->close();
+    $name = trim((string)($row['display_name'] ?? ''));
+    return $matches[1] . ($name !== '' ? $name : $legacyName);
+}
+
+function receipt_mask_transfer_detail_for_display(mysqli $conn, string $detail): string
+{
+    if (preg_match('/^(Transfer\\s+(?:sent\\s+to|received\\s+from)\\s+)(.+)$/iu', trim($detail), $matches) !== 1) return $detail;
+    $name = trim($matches[2]);
+    $st = receipt_prepare($conn,
+        "SELECT first_name,last_name FROM students WHERE Fname=? "
+        . "OR TRIM(CONCAT_WS(' ',NULLIF(first_name,''),NULLIF(last_name,'')))=? LIMIT 1");
+    $st->bind_param('ss', $name, $name); $st->execute(); $row = $st->get_result()->fetch_assoc(); $st->close();
+    $masked = is_array($row)
+        ? receipt_mask_name_parts((string)($row['first_name']??''),(string)($row['last_name']??''))
+        : receipt_mask_student_name($name);
+    return $matches[1] . $masked;
+}
+
+function receipt_mask_student_id(string $studentId): string
+{
+    if (function_exists('mb_substr')) {
+        $visiblePrefix = mb_substr($studentId, 0, 4, 'UTF-8');
+    } else {
+        preg_match_all('/./us', $studentId, $characters);
+        $visiblePrefix = implode('', array_slice($characters[0] ?? [], 0, 4));
+    }
+
+    return $visiblePrefix . '••••••';
+}
+
+function receipt_mask_transfer_detail(string $detail): string
+{
+    if (preg_match(
+        '/^(Transfer\s+(?:sent\s+to|received\s+from)\s+)(.+)$/iu',
+        trim($detail),
+        $matches
+    ) !== 1) {
+        return $detail;
+    }
+
+    return $matches[1] . receipt_mask_student_name(trim($matches[2]));
+}
+
 function receipt_assert_viewer_access(
     mysqli $conn,
     array $transaction,
@@ -210,8 +365,6 @@ function receipt_fetch(
 
     receipt_assert_viewer_access($conn, $transaction, $viewerRole, $viewerId);
 
-    // An outgoing transfer is owned by the sender for access-control purposes,
-    // but the receipt's Student fields identify the party receiving the funds.
     if ((string)$transaction['transaction_type'] === 'transfer-out'
         && receipt_table_exists($conn, 'student_transfers')) {
         $recipientStatement = receipt_prepare(
@@ -261,6 +414,38 @@ function receipt_fetch(
         $itemStatement->close();
     }
 
+    $studentName = receipt_account_name_without_middle(
+        $conn,
+        'students',
+        (string)$transaction['student_num_snapshot'],
+        (string)$transaction['student_name_snapshot']
+    );
+    $studentId = (string)$transaction['student_num_snapshot'];
+    $description = receipt_transfer_detail_without_middle(
+        $conn,
+        (string)($transaction['description'] ?? '')
+    );
+    $processedBy = receipt_processed_by($transaction);
+    if (($processedBy['account_source'] ?? '') !== '') {
+        $processedBy['name'] = receipt_account_name_without_middle(
+            $conn,
+            (string)$processedBy['account_source'],
+            (string)($processedBy['id'] ?? ''),
+            (string)($processedBy['name'] ?? '')
+        );
+    }
+    if ($viewerRole === 'admin') {
+        $studentName = receipt_mask_account_name(
+            $conn, 'students', (string)$transaction['student_num_snapshot'], $studentName
+        );
+        $studentId = receipt_mask_student_id($studentId);
+        $description = receipt_mask_transfer_detail_for_display($conn, $description);
+        foreach ($items as &$item) {
+            $item['name'] = receipt_mask_transfer_detail_for_display($conn, (string)$item['name']);
+        }
+        unset($item);
+    }
+
     return [
         'transaction_id' => (int)$transaction['transaction_id'],
         'receipt_number' => (string)$transaction['receipt_number'],
@@ -268,15 +453,15 @@ function receipt_fetch(
         'currency' => (string)$transaction['currency'],
         'legacy_backfilled' => (bool)$transaction['legacy_backfilled'],
         'transaction_type' => (string)$transaction['transaction_type'],
-        'description' => (string)($transaction['description'] ?? ''),
+        'description' => $description,
         'amount' => number_format((float)$transaction['amount'], 2, '.', ''),
         'date_time' => (string)$transaction['event_time'],
         'issued_at' => (string)$transaction['issued_at'],
         'student' => [
-            'id' => (string)$transaction['student_num_snapshot'],
-            'name' => (string)$transaction['student_name_snapshot'],
+            'id' => $studentId,
+            'name' => $studentName,
         ],
-        'processed_by' => receipt_processed_by($transaction),
+        'processed_by' => $processedBy,
         'canteen' => [
             'id' => (string)($transaction['canteen_id_snapshot'] ?? ''),
             'name' => (string)($transaction['canteen_name_snapshot'] ?? ''),

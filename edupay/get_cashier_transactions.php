@@ -21,7 +21,7 @@ if ($cashierId === '') {
 $stmt = $conn->prepare(<<<'SQL'
     SELECT
         t.transaction_id AS id,
-        COALESCE(s.Fname, 'Unknown student') AS recipientName,
+        COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(s.first_name, ''), NULLIF(s.last_name, ''))), ''), s.Fname, 'Unknown student') AS recipientName,
         t.student_num AS recipientNumber,
         COALESCE(
             NULLIF(t.description, ''),

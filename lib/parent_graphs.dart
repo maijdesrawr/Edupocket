@@ -373,57 +373,63 @@ class _ParentGraphsState extends State<ParentGraphs> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: List.generate(widget.children.length, (index) {
-            final child = widget.children[index];
-            final childId = (child['child_id'] ?? '').toString();
-            final selected = childId == _selectedChildId;
-
-            return Padding(
-              padding: EdgeInsets.only(
-                right: index == widget.children.length - 1 ? 0 : 8,
-              ),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () {
-                  if (childId == _selectedChildId) return;
-
-                  setState(() {
-                    _selectedChildId = childId;
-                    _totalBalance = _asDouble(child['balance']);
-                    _totalExpense = 0;
-                    _topups = [];
-                    _expenses = [];
-                  });
-
-                  _fetchGraphData();
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: 140,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: selected ? _deepRed : _softPink,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    (child['child_name'] ?? 'Student').toString(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: selected ? Colors.white : _primaryRed,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+      child: widget.children.length == 1
+          ? Center(child: _buildChildSelectorItem(widget.children.single))
+          : SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: List.generate(
+                  widget.children.length,
+                  (index) => Padding(
+                    padding: EdgeInsets.only(
+                      right: index == widget.children.length - 1 ? 0 : 8,
                     ),
+                    child: _buildChildSelectorItem(widget.children[index]),
                   ),
                 ),
               ),
-            );
-          }),
+            ),
+    );
+  }
+
+  Widget _buildChildSelectorItem(Map<String, dynamic> child) {
+    final childId = (child['child_id'] ?? '').toString();
+    final selected = childId == _selectedChildId;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () {
+        if (childId == _selectedChildId) return;
+
+        setState(() {
+          _selectedChildId = childId;
+          _totalBalance = _asDouble(child['balance']);
+          _totalExpense = 0;
+          _topups = [];
+          _expenses = [];
+        });
+
+        _fetchGraphData();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 140,
+        height: 36,
+        decoration: BoxDecoration(
+          color: selected ? _deepRed : _softPink,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Text(
+          (child['child_name'] ?? 'Student').toString(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: selected ? Colors.white : _primaryRed,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );

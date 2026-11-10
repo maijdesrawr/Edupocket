@@ -27,7 +27,7 @@ $topup_stmt = $conn->prepare("
         t.method,
         t.status,
         t.date_time,
-        s.Fname AS child_name
+        COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(s.first_name, ''), NULLIF(s.last_name, ''))), ''), s.Fname) AS child_name
     FROM topups t
     INNER JOIN students s ON t.student_num = s.student_num
     WHERE t.parent_id = ?
@@ -67,7 +67,7 @@ $topup_stmt->close();
 $balance_stmt = $conn->prepare("
     SELECT 
         s.student_num,
-        s.Fname,
+        COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(s.first_name, ''), NULLIF(s.last_name, ''))), ''), s.Fname) AS Fname,
         s.balance,
         COALESCE(SUM(CASE WHEN t.transaction_type = 'payment' THEN t.amount ELSE 0 END), 0) AS total_spent
     FROM parent_student_link psl

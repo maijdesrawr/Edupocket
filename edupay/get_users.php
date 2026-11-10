@@ -42,9 +42,9 @@ try {
         $query = $conn->query("
             SELECT 
                 s.student_num, 
-                s.Fname AS name,      
+                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(s.first_name, ''), NULLIF(s.last_name, ''))), ''), s.Fname) AS name,
                 s.balance, s.parent_id, 
-                p.Fname AS parent_name, 
+                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(p.first_name, ''), NULLIF(p.last_name, ''))), ''), p.Fname) AS parent_name,
                 s.profile_photo,
                 $failedAttemptsSelect,
                 $isLockedSelect
@@ -56,8 +56,8 @@ try {
         $query = $conn->query("
             SELECT 
                 p.parent_id, 
-                p.Fname AS name,      
-                (SELECT GROUP_CONCAT(DISTINCT s2.Fname ORDER BY s2.student_num SEPARATOR ', ') FROM students s2 WHERE s2.parent_id = p.parent_id OR EXISTS (SELECT 1 FROM parent_student_link l WHERE l.parent_id = p.parent_id AND l.student_num = s2.student_num)) AS student_name,
+                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(p.first_name, ''), NULLIF(p.last_name, ''))), ''), p.Fname) AS name,
+                (SELECT GROUP_CONCAT(DISTINCT COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(s2.first_name, ''), NULLIF(s2.last_name, ''))), ''), s2.Fname) ORDER BY s2.student_num SEPARATOR ', ') FROM students s2 WHERE s2.parent_id = p.parent_id OR EXISTS (SELECT 1 FROM parent_student_link l WHERE l.parent_id = p.parent_id AND l.student_num = s2.student_num)) AS student_name,
                 (SELECT GROUP_CONCAT(DISTINCT s2.student_num ORDER BY s2.student_num SEPARATOR ', ') FROM students s2 WHERE s2.parent_id = p.parent_id OR EXISTS (SELECT 1 FROM parent_student_link l WHERE l.parent_id = p.parent_id AND l.student_num = s2.student_num)) AS student_nums, 
                 p.profile_photo
             FROM parents p

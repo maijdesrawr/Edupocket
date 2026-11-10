@@ -29,7 +29,7 @@ $failedAttemptsSelect = $hasFailedAttempts ? 'failed_attempts' : '0 AS failed_at
 $isLockedSelect = $hasIsLocked ? 'is_locked' : '0 AS is_locked';
 
 $stmt = $conn->prepare(
-    "SELECT student_num AS id, Fname AS name, balance, $failedAttemptsSelect, $isLockedSelect
+    "SELECT student_num AS id, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', NULLIF(first_name, ''), NULLIF(last_name, ''))), ''), Fname) AS name, balance, $failedAttemptsSelect, $isLockedSelect
      FROM students
      WHERE student_num = ?
      LIMIT 1"

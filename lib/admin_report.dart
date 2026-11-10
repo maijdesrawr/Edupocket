@@ -7,6 +7,7 @@ import 'admin_home.dart';
 import 'admin_profile.dart';
 import 'admin_users.dart';
 import 'api_config.dart';
+import 'app_session_service.dart';
 import 'receipt_screen.dart';
 
 @visibleForTesting
@@ -15,6 +16,27 @@ int adminReportTransactionId(Map<String, dynamic> transaction) {
         (transaction['transaction_id'] ?? transaction['id'] ?? '').toString(),
       ) ??
       0;
+}
+
+@visibleForTesting
+String adminReportMaskTransferDetail(String detail) {
+  final match = RegExp(
+    r'^(Transfer\s+(?:sent\s+to|received\s+from)\s+)(.+)$',
+    caseSensitive: false,
+  ).firstMatch(detail.trim());
+  if (match == null) return detail;
+
+  final nameParts = match.group(2)!.trim().split(RegExp(r'\s+'));
+  final firstInitial = String.fromCharCode(nameParts.first.runes.first);
+  final maskedSurname = nameParts.skip(1).toList().asMap().entries.map((entry) {
+    final initial = String.fromCharCode(entry.value.runes.first);
+    final bullets = entry.key == 0 ? 4 : 3;
+    return '$initial${List.filled(bullets, '\u2022').join()}';
+  }).join();
+  final maskedName = nameParts.length == 1
+      ? '$firstInitial\u2022\u2022\u2022'
+      : '$firstInitial\u2022\u2022\u2022 $maskedSurname';
+  return '${match.group(1)}$maskedName';
 }
 
 class AdminReportsPage extends StatefulWidget {
@@ -38,12 +60,9 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
   static const Color _panelPink = Color(0xFFF2B2A9);
   static const Color _successGreen = Color(0xFF119D34);
 
-  final TextEditingController _searchController = TextEditingController();
-
   int _selectedIndex = 2;
   bool _isLoading = true;
   String _selectedFilter = 'All';
-  String _searchQuery = '';
   List<Map<String, dynamic>> _transactions = [];
 
   @override
@@ -52,19 +71,22 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
     _fetchTransactions();
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
   Future<void> _fetchTransactions() async {
     setState(() => _isLoading = true);
 
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.url('get_all_transactions.php')),
+        headers: AppSessionService.instance.authorizationHeaders,
       );
+      if (await AppSessionService.instance.handleResponse(response)) {
+        if (!mounted) return;
+        setState(() {
+          _transactions = [];
+          _isLoading = false;
+        });
+        return;
+      }
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
         if (data['status'] == 'success') {
@@ -137,12 +159,7 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
         return false;
       }
 
-      final query = _searchQuery.trim().toLowerCase();
-      if (query.isEmpty) return true;
-
-      final title = _transactionTitle(tx).toLowerCase();
-      final name = (tx['name'] ?? '').toString().toLowerCase();
-      return title.contains(query) || name.contains(query);
+      return true;
     }).toList();
   }
 
@@ -196,8 +213,6 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      _buildSearchField(),
-                      const SizedBox(height: 16),
                       _buildFilterTabs(),
                       const SizedBox(height: 16),
                       Expanded(
@@ -227,36 +242,6 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
         ),
       ),
       bottomNavigationBar: _buildBottomNav(),
-    );
-  }
-
-  Widget _buildSearchField() {
-    return Container(
-      height: 42,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (value) {
-          setState(() => _searchQuery = value);
-        },
-        style: const TextStyle(
-          color: Colors.black87,
-          fontSize: 14,
-        ),
-        decoration: const InputDecoration(
-          border: InputBorder.none,
-          prefixIcon: Icon(Icons.search, color: Colors.black87, size: 22),
-          hintText: 'Search By Name...',
-          hintStyle: TextStyle(
-            color: Color(0xFF9A9A9A),
-            fontSize: 14,
-          ),
-          contentPadding: EdgeInsets.symmetric(vertical: 11),
-        ),
-      ),
     );
   }
 
@@ -530,7 +515,7 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
 
   String _transactionTitle(Map<String, dynamic> tx) {
     final note = (tx['note'] ?? '').toString().trim();
-    if (note.isNotEmpty) return note;
+    if (note.isNotEmpty) return adminReportMaskTransferDetail(note);
     return _isTopUp(tx) ? 'Wallet Top-up' : 'Payment';
   }
 
