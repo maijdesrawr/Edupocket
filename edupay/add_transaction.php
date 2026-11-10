@@ -1,6 +1,14 @@
 <?php
 header('Content-Type: application/json');
 include 'db_connect.php';
+require_once __DIR__ . '/app_session_common.php';
+
+$appSession = as_require_session($conn, false);
+$processor_role = strtolower(trim((string)($appSession['role'] ?? '')));
+$processor_account_source = strtolower(trim(
+    (string)($appSession['account_source'] ?? '')
+));
+$processor_id = trim((string)($appSession['user_id'] ?? ''));
 
 $student_num = $_POST['student_num'] ?? '';
 $amount = $_POST['amount'] ?? '';
@@ -13,10 +21,21 @@ if (empty($student_num) || empty($amount)) {
 }
 
 $stmt = $conn->prepare("
-    INSERT INTO transactions (student_num, amount, transaction_type, description, date_time)
-    VALUES (?, ?, ?, ?, NOW())
+    INSERT INTO transactions
+        (student_num, amount, transaction_type, description,
+         processor_role, processor_account_source, processor_id, date_time)
+    VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
 ");
-$stmt->bind_param("sdss", $student_num, $amount, $transaction_type, $description);
+$stmt->bind_param(
+    "sdsssss",
+    $student_num,
+    $amount,
+    $transaction_type,
+    $description,
+    $processor_role,
+    $processor_account_source,
+    $processor_id
+);
 
 if ($stmt->execute()) {
     echo json_encode(['status' => 'success', 'message' => 'Transaction recorded successfully']);

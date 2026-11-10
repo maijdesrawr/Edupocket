@@ -53,7 +53,6 @@ class _AdminHomeState extends State<AdminHome> {
   List<dynamic> _canteenSales = [];
   List<dynamic> _cashierSales = [];
   List<dynamic> _needsAttention = [];
-  List<dynamic> _systemSecurity = [];
   String _period = 'all';
   String _sort = 'sales';
   DateTime? _customStart;
@@ -110,8 +109,6 @@ class _AdminHomeState extends State<AdminHome> {
           _cashierSales = List<dynamic>.from(data['cashier_sales'] ?? const []);
           _needsAttention =
               List<dynamic>.from(data['needs_attention'] ?? const []);
-          _systemSecurity =
-              List<dynamic>.from(data['system_security'] ?? const []);
           _isLoading = false;
         });
         return;
@@ -250,10 +247,6 @@ class _AdminHomeState extends State<AdminHome> {
                           _sectionTitle('Needs attention'),
                           const SizedBox(height: 9),
                           _buildNeedsAttention(),
-                          const SizedBox(height: 16),
-                          _sectionTitle('Account Freeze & Deletion'),
-                          const SizedBox(height: 9),
-                          _buildAccountChanges(),
                         ],
                       )),
                     ],
@@ -763,37 +756,6 @@ class _AdminHomeState extends State<AdminHome> {
             const SnackBar(content: Text('Could not send the email alert.')));
     }
   }
-
-  Widget _buildAccountChanges() => _systemSecurity.isEmpty
-      ? _whiteMessage('No recent account freezes or deletions.')
-      : Column(
-          children: _systemSecurity.map((dynamic raw) {
-          final item = Map<String, dynamic>.from(raw as Map);
-          return Container(
-              width: double.infinity,
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-              decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: const [
-                    BoxShadow(
-                        color: _cardShadow, blurRadius: 7, offset: Offset(0, 2))
-                  ]),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('${item['title'] ?? 'Account change'}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 13)),
-                    const SizedBox(height: 3),
-                    Text(_formatActivityTimestamp(item['created_at']),
-                        style: const TextStyle(
-                            color: Colors.black38, fontSize: 10))
-                  ]));
-        }).toList());
 
   String _formatActivityTimestamp(dynamic value) {
     final timestamp = value?.toString() ?? '';

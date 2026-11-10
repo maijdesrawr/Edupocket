@@ -56,9 +56,48 @@ try {
 
     $order = $sort === 'transactions' ? 'payment_count DESC, sales DESC' : 'sales DESC, payment_count DESC';
     $canteens=[]; $cashiers=[];
-    $sql = "SELECT c.canteen_id id, COALESCE(NULLIF(c.Fname,''), CONCAT('Canteen ',c.canteen_id)) name, COALESCE(SUM(t.amount),0) sales, COUNT(t.transaction_id) payment_count FROM canteens c LEFT JOIN transactions t ON t.canteen_id=c.canteen_id AND t.transaction_type='payment' $where GROUP BY c.canteen_id,c.Fname ORDER BY $order";
+    $paymentRowsSql = "SELECT t.transaction_id, t.amount, t.date_time, t.date_created,
+            COALESCE(NULLIF(TRIM(t.canteen_id), ''), NULLIF(TRIM(ca.canteen_id), ''), NULLIF(TRIM(a.canteen_id), '')) canteen_id,
+            COALESCE(NULLIF(TRIM(t.cashier_id), ''),
+                CASE WHEN LOWER(COALESCE(t.processor_role, '')) = 'cashier'
+                    THEN NULLIF(TRIM(t.processor_id), '') END) cashier_id,
+            CASE
+                WHEN LOWER(COALESCE(t.processor_account_source, '')) IN ('cashiers', 'admins')
+                    THEN LOWER(t.processor_account_source)
+                WHEN ca.cashier_id IS NOT NULL THEN 'cashiers'
+                WHEN a.admin_id IS NOT NULL THEN 'admins'
+                ELSE NULL
+            END cashier_source
+        FROM transactions t
+        LEFT JOIN cashiers ca
+            ON ca.cashier_id = COALESCE(NULLIF(TRIM(t.cashier_id), ''),
+                CASE WHEN LOWER(COALESCE(t.processor_role, '')) = 'cashier'
+                    THEN NULLIF(TRIM(t.processor_id), '') END)
+            AND (NULLIF(LOWER(TRIM(t.processor_account_source)), '') IS NULL
+                OR LOWER(TRIM(t.processor_account_source)) = 'cashiers')
+        LEFT JOIN admins a
+            ON a.admin_id = COALESCE(NULLIF(TRIM(t.cashier_id), ''),
+                CASE WHEN LOWER(COALESCE(t.processor_role, '')) = 'cashier'
+                    THEN NULLIF(TRIM(t.processor_id), '') END)
+            AND LOWER(COALESCE(a.role, '')) = 'cashier'
+            AND (LOWER(COALESCE(t.processor_account_source, '')) = 'admins'
+                OR (NULLIF(LOWER(TRIM(t.processor_account_source)), '') IS NULL
+                    AND ca.cashier_id IS NULL))
+        WHERE t.transaction_type = 'payment'";
+    $sql = "SELECT c.canteen_id id, COALESCE(NULLIF(c.Fname,''), CONCAT('Canteen ',c.canteen_id)) name, COALESCE(SUM(t.amount),0) sales, COUNT(t.transaction_id) payment_count FROM canteens c LEFT JOIN ($paymentRowsSql) t ON t.canteen_id=c.canteen_id $where GROUP BY c.canteen_id,c.Fname ORDER BY $order";
     if ($res=$conn->query($sql)) while($r=$res->fetch_assoc()) $canteens[]=['id'=>$r['id'],'name'=>$r['name'],'sales'=>(float)$r['sales'],'payment_count'=>(int)$r['payment_count']];
-    $sql = "SELECT ca.cashier_id id, COALESCE(NULLIF(ca.Fname,''), CONCAT('Cashier ',ca.cashier_id)) name, COALESCE(c.Fname,'Unassigned canteen') canteen, COALESCE(SUM(t.amount),0) sales, COUNT(t.transaction_id) payment_count FROM cashiers ca LEFT JOIN canteens c ON c.canteen_id=ca.canteen_id LEFT JOIN transactions t ON t.cashier_id=ca.cashier_id AND t.transaction_type='payment' $where GROUP BY ca.cashier_id,ca.Fname,c.Fname ORDER BY $order";
+    $sql = "SELECT t.cashier_id id,
+            COALESCE(NULLIF(ca.Fname, ''), NULLIF(a.Fname, ''), CONCAT('Cashier ', t.cashier_id)) name,
+            COALESCE(c.Fname, 'Unassigned canteen') canteen,
+            COALESCE(SUM(t.amount), 0) sales, COUNT(t.transaction_id) payment_count
+        FROM ($paymentRowsSql) t
+        LEFT JOIN cashiers ca ON ca.cashier_id = t.cashier_id AND t.cashier_source = 'cashiers'
+        LEFT JOIN admins a ON a.admin_id = t.cashier_id
+            AND LOWER(COALESCE(a.role, '')) = 'cashier' AND t.cashier_source = 'admins'
+        LEFT JOIN canteens c ON c.canteen_id = t.canteen_id
+        WHERE NULLIF(TRIM(t.cashier_id), '') IS NOT NULL $where
+        GROUP BY t.cashier_id, t.cashier_source, ca.Fname, a.Fname, c.Fname
+        ORDER BY $order";
     if ($res=$conn->query($sql)) while($r=$res->fetch_assoc()) $cashiers[]=['id'=>$r['id'],'name'=>$r['name'],'canteen'=>$r['canteen'],'sales'=>(float)$r['sales'],'payment_count'=>(int)$r['payment_count']];
 
     $needs=[];

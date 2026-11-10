@@ -98,6 +98,21 @@ if (empty($student_id) || empty($cashier_id) || empty($amount) || empty($pin)) {
     exit;
 }
 
+$appSession = as_require_session($conn, false);
+as_assert_session_identity($appSession, 'cashier', (string)$cashier_id);
+$processor_account_source = strtolower(trim(
+    (string)($appSession['account_source'] ?? '')
+));
+$processor_id = trim((string)($appSession['user_id'] ?? ''));
+if (!in_array($processor_account_source, ['cashiers', 'admins'], true)
+    || $processor_id === '') {
+    echo json_encode([
+        "status" => "error",
+        "message" => "The cashier session identity is invalid"
+    ]);
+    exit;
+}
+
 if (!is_numeric($amount) || $amount <= 0) {
     echo json_encode([
         "status" => "error",
@@ -195,10 +210,20 @@ try {
 
     $insert = $conn->prepare(
         "INSERT INTO transactions 
-        (student_num, amount, transaction_type, description, cashier_id, bill_payment_id)
-        VALUES (?, ?, 'payment', ?, ?, ?)"
+        (student_num, amount, transaction_type, description, cashier_id,
+         processor_role, processor_account_source, processor_id, bill_payment_id)
+        VALUES (?, ?, 'payment', ?, ?, 'cashier', ?, ?, ?)"
     );
-    $insert->bind_param("sdssi", $student_id, $amount, $description, $cashier_id, $bill_payment_id);
+    $insert->bind_param(
+        "sdssssi",
+        $student_id,
+        $amount,
+        $description,
+        $cashier_id,
+        $processor_account_source,
+        $processor_id,
+        $bill_payment_id
+    );
     $insert->execute();
 
     $conn->commit();
