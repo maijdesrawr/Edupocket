@@ -12,6 +12,7 @@ try {
     if(!is_array($input)) $input=$_POST;
     $type=(string)($input['type']??''); $role=(string)($input['role']??''); $source=(string)($input['source']??''); $id=trim((string)($input['user_id']??''));
     if($id==='' || !in_array($type,['login_failures','failed_transactions','account_setup'],true)) pc_reject('Invalid alert request.');
+    $alertId=(int)($input['alert_id']??0); $requestedLastAttemptId=(int)($input['last_attempt_id']??0);
     $name='User';
     if($source==='students' && $role==='student') {
         $st=pc_prepare($conn,'SELECT COALESCE(NULLIF(TRIM(CONCAT_WS(" ",first_name,middle_name,last_name,suffix)),""),Fname,"Student") name FROM students WHERE student_num=? LIMIT 1');
@@ -26,31 +27,63 @@ try {
 
     $lastAttemptId=0;
     if($type==='account_setup') {
-        if($source!=='students' || $role!=='student' || !pc_table_exists($conn,'app_activity_events') || !pc_table_exists($conn,'admin_dashboard_alert_sends')) pc_reject('This account is not eligible for an email reminder.');
-        $st=pc_prepare($conn,"SELECT 1 FROM app_activity_events e JOIN students s ON s.student_num=JSON_UNQUOTE(JSON_EXTRACT(e.metadata_json,'$.student_num')) LEFT JOIN parent_student_link l ON l.student_num=s.student_num LEFT JOIN parents p ON p.parent_id=l.parent_id LEFT JOIN admin_dashboard_alert_sends d ON d.alert_type='account_setup' AND d.account_role='student' AND d.account_source='students' AND d.user_id=s.student_num WHERE e.event_name IN ('student_family_account_created','student_account_created') AND s.student_num=? AND e.created_at<=DATE_SUB(NOW(),INTERVAL 3 DAY) AND (COALESCE(s.password_changed,0)=0 OR COALESCE(p.password_changed,1)=0) AND d.send_id IS NULL LIMIT 1"); $st->bind_param('s',$id); $st->execute(); $eligible=(bool)$st->get_result()->fetch_row(); $st->close();
+        if($source!=='students' || $role!=='student' || !pc_table_exists($conn,'app_activity_events') || !pc_table_exists($conn,'admin_dashboard_alert_sends') || !pc_table_exists($conn,'admin_dashboard_alert_dismissals')) pc_reject('This account is not eligible for an email reminder.');
+        $st=pc_prepare($conn,"SELECT 1 FROM app_activity_events e JOIN students s ON s.student_num=JSON_UNQUOTE(JSON_EXTRACT(e.metadata_json,'$.student_num')) LEFT JOIN parent_student_link l ON l.student_num=s.student_num LEFT JOIN parents p ON p.parent_id=l.parent_id LEFT JOIN admin_dashboard_alert_sends d ON d.alert_type='account_setup' AND d.account_role='student' AND d.account_source='students' AND d.user_id=s.student_num LEFT JOIN admin_dashboard_alert_dismissals x ON x.alert_type='account_setup' AND x.account_role='student' AND x.account_source='students' AND x.user_id=s.student_num AND x.alert_id=0 AND x.dismissed_at>DATE_SUB(NOW(),INTERVAL 7 DAY) WHERE e.event_name IN ('student_family_account_created','student_account_created') AND s.student_num=? AND e.created_at<=DATE_SUB(NOW(),INTERVAL 3 DAY) AND (COALESCE(s.password_changed,0)=0 OR COALESCE(p.password_changed,1)=0) AND (d.send_id IS NULL OR d.sent_at<=DATE_SUB(NOW(),INTERVAL 7 DAY)) AND x.dismissal_id IS NULL LIMIT 1"); $st->bind_param('s',$id); $st->execute(); $eligible=(bool)$st->get_result()->fetch_row(); $st->close();
         if(!$eligible) pc_reject('This account no longer needs setup.');
         $subject='EduPocket Account Setup Reminder';
         $body="Hello {$name},\n\nYour EduPocket account was created at least three days ago, but its temporary password has not yet been changed. Please sign in using the credentials sent to your UE email and update your password.\n\nIf you need help, contact the school administration.\n\nBest regards,\nSchool Administration";
     } else {
-        if(!pc_table_exists($conn,'admin_security_attempts') || !pc_table_exists($conn,'admin_dashboard_alert_sends')) pc_reject('Security alert history is not configured.');
-        $attemptType=$type==='login_failures'?'login_password':($source==='cashiers'?'topup_pin':'payment_pin');
-        $st=pc_prepare($conn,"SELECT COUNT(*) n,COALESCE(MAX(a.attempt_id),0) max_id FROM admin_security_attempts a LEFT JOIN admin_dashboard_alert_sends d ON d.alert_type=? AND d.account_role=a.account_role AND d.account_source=a.account_source AND d.user_id=a.user_id WHERE a.account_role=? AND a.account_source=? AND a.user_id=? AND a.attempt_type=? AND a.created_at>=DATE_SUB(NOW(),INTERVAL 24 HOUR) AND a.attempt_id>COALESCE(d.last_attempt_id,0)"); $alertType=$type; $st->bind_param('sssss',$alertType,$role,$source,$id,$attemptType); $st->execute(); $attemptRow=$st->get_result()->fetch_assoc(); $count=(int)($attemptRow['n']??0); $lastAttemptId=(int)($attemptRow['max_id']??0); $st->close();
-        if($count<3) pc_reject('The alert threshold has not been reached.');
+        if(!pc_table_exists($conn,'admin_dashboard_alert_sends')) pc_reject('The alert email feature is not ready on this server.');
+        $attemptRow=null;
+        if($alertId>0 && pc_table_exists($conn,'admin_security_alert_incidents')) {
+            $dismissalJoin=pc_table_exists($conn,'admin_dashboard_alert_dismissals')
+                ? ' LEFT JOIN admin_dashboard_alert_dismissals x ON x.alert_type=i.alert_type AND x.account_role=i.account_role AND x.account_source=i.account_source AND x.user_id=i.user_id AND x.alert_id=i.alert_id'
+                : '';
+            $dismissalFilter=$dismissalJoin!=='' ? ' AND x.dismissal_id IS NULL' : '';
+            $st=pc_prepare($conn,"SELECT i.attempt_type,i.attempt_count,i.first_at,i.last_at,i.last_attempt_id FROM admin_security_alert_incidents i $dismissalJoin WHERE i.alert_id=? AND i.alert_type=? AND i.account_role=? AND i.account_source=? AND i.user_id=? AND i.email_sent_at IS NULL $dismissalFilter LIMIT 1");
+            $st->bind_param('issss',$alertId,$type,$role,$source,$id); $st->execute(); $attemptRow=$st->get_result()->fetch_assoc(); $st->close();
+        }
+        if(!$attemptRow && ($alertId<1 || !pc_table_exists($conn,'admin_security_alert_incidents')) && pc_table_exists($conn,'admin_security_attempts')) {
+            $attemptTypeFilter=$type==='login_failures' ? "a.attempt_type='login_password'" : "a.attempt_type IN ('payment_pin','topup_pin')";
+            $sentType=$type;
+            $attemptCeilingFilter=$requestedLastAttemptId>0 ? ' AND a.attempt_id<=?' : '';
+            $st=pc_prepare($conn,"SELECT a.attempt_type,COUNT(*) attempt_count,MIN(a.created_at) first_at,MAX(a.created_at) last_at,MAX(a.attempt_id) last_attempt_id FROM admin_security_attempts a LEFT JOIN admin_dashboard_alert_sends d ON d.alert_type=? AND d.account_role=a.account_role AND d.account_source=a.account_source AND d.user_id=a.user_id WHERE a.account_role=? AND a.account_source=? AND a.user_id=? AND $attemptTypeFilter AND a.created_at>=DATE_SUB(NOW(),INTERVAL 24 HOUR) AND a.attempt_id>COALESCE(d.last_attempt_id,0) $attemptCeilingFilter GROUP BY a.attempt_type HAVING COUNT(*)>=3 ORDER BY MAX(a.attempt_id) DESC LIMIT 1");
+            if($requestedLastAttemptId>0) $st->bind_param('ssssi',$sentType,$role,$source,$id,$requestedLastAttemptId);
+            else $st->bind_param('ssss',$sentType,$role,$source,$id);
+            $st->execute(); $attemptRow=$st->get_result()->fetch_assoc(); $st->close();
+        }
+        if(!$attemptRow) pc_reject('This alert has expired or has already been handled. Refresh the dashboard and try again.');
+        $attemptType=(string)$attemptRow['attempt_type'];
+        $count=(int)$attemptRow['attempt_count'];
+        $firstAt=(string)$attemptRow['first_at'];
+        $lastAt=(string)$attemptRow['last_at'];
+        $lastAttemptId=(int)$attemptRow['last_attempt_id'];
+        $activityPeriod=$firstAt===$lastAt?$firstAt:"{$firstAt} to {$lastAt}";
         if($type==='login_failures') {
             $subject='Security Alert: Unusual Login Activity Detected';
-            $body="Hello {$name},\n\nWe've detected unusual activity involving multiple unsuccessful login attempts on your EduPocket account.\n\nThis activity has been flagged for security purposes. If you initiated these attempts, please double-check your Student ID or Parent Account ID and password before trying to sign in again.\n\nIf you do not recognize this activity, we strongly advise you to change your account password immediately and contact the school administration to report the suspicious login attempts and request an account security review.\n\nFor your protection, please use a strong, unique password and keep your login credentials confidential.\n\nBest regards,\nSchool Administration";
+            $body="Hello {$name},\n\nWe've detected {$count} unsuccessful password sign-in attempts on your EduPocket account between {$activityPeriod}.\n\nThis activity has been flagged for security purposes. If you initiated these attempts, please double-check your Student ID or Parent Account ID and password before trying to sign in again.\n\nIf you do not recognize this activity, we strongly advise you to change your account password immediately and contact the school administration to report the suspicious login attempts and request an account security review.\n\nFor your protection, please use a strong, unique password and keep your login credentials confidential.\n\nBest regards,\nSchool Administration";
         } else {
             $subject='Security Alert: Unusual Activity Detected';
-            $body="Hello {$name},\n\nWe've detected unusual activity involving your recent top-up and payment attempts on your EduPocket account.\n\nThis activity has been flagged for security purposes. If you initiated these attempts, please verify your PIN before proceeding with another transaction.\n\nIf you do not recognize this activity, please contact the school administration immediately to report the suspicious attempts and request an account security review.\n\nPlease remain cautious and keep your account credentials and PIN confidential.\n\nBest regards,\nSchool Administration";
+            $body="Hello {$name},\n\nWe've detected {$count} unsuccessful payment or top-up PIN attempts on your EduPocket account between {$activityPeriod}.\n\nThis activity has been flagged for security purposes. If you initiated these attempts, please verify your PIN before proceeding with another transaction.\n\nIf you do not recognize this activity, please contact the school administration immediately to report the suspicious attempts and request an account security review.\n\nPlease remain cautious and keep your account credentials and PIN confidential.\n\nBest regards,\nSchool Administration";
         }
     }
     $config=pc_security_config();
     $destination=ev_resolve_verified_email_destination($conn,$config,$role,$source,$id);
     $sender=pc_email_config($config)['send_callback'];
     $sent=$sender($destination,'',['purpose'=>'admin_security_alert','subject'=>$subject,'message'=>$body,'html_message'=>'<div style="font-family:Arial,sans-serif;line-height:1.6">'.nl2br(htmlspecialchars($body,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8')).'</div>']);
-    if($sent!==true) pc_reject('The email could not be sent. Please try again later.');
+    if($sent!==true) pc_reject('The mail server did not accept the message. Check the server SMTP configuration and PHP error log, then try again.');
+    if($type!=='account_setup' && pc_table_exists($conn,'admin_security_alert_incidents')) {
+        if($alertId>0) {
+            $markIncident=pc_prepare($conn,'UPDATE admin_security_alert_incidents SET email_sent_at=NOW(6) WHERE alert_id=? AND email_sent_at IS NULL');
+            $markIncident->bind_param('i',$alertId);
+        } else {
+            $markIncident=pc_prepare($conn,'UPDATE admin_security_alert_incidents SET email_sent_at=NOW(6) WHERE alert_type=? AND account_role=? AND account_source=? AND user_id=? AND last_attempt_id=? AND email_sent_at IS NULL');
+            $markIncident->bind_param('ssssi',$type,$role,$source,$id,$lastAttemptId);
+        }
+        $markIncident->execute(); $markIncident->close();
+    }
     $alertType=$type;
-    $mark=pc_prepare($conn,'INSERT INTO admin_dashboard_alert_sends (alert_type,account_role,account_source,user_id,last_attempt_id,sent_at) VALUES (?,?,?,?,?,NOW(6)) ON DUPLICATE KEY UPDATE last_attempt_id=VALUES(last_attempt_id),sent_at=NOW(6)');
+    $mark=pc_prepare($conn,'INSERT INTO admin_dashboard_alert_sends (alert_type,account_role,account_source,user_id,last_attempt_id,sent_at) VALUES (?,?,?,?,?,NOW(6)) ON DUPLICATE KEY UPDATE last_attempt_id=GREATEST(last_attempt_id,VALUES(last_attempt_id)),sent_at=NOW(6)');
     $mark->bind_param('ssssi',$alertType,$role,$source,$id,$lastAttemptId); $mark->execute(); $mark->close();
     pc_respond(['status'=>'success','message'=>'Security email sent.']);
 } catch(Throwable $e) {

@@ -53,6 +53,10 @@ class _AdminHomeState extends State<AdminHome> {
   List<dynamic> _canteenSales = [];
   List<dynamic> _cashierSales = [];
   List<dynamic> _needsAttention = [];
+  final Set<String> _selectedAlertKeys = {};
+  bool _isSendingSelectedAlerts = false;
+  bool _isDeletingSelectedAlerts = false;
+  String _alertFilter = 'all';
   String _period = 'all';
   String _sort = 'sales';
   DateTime? _customStart;
@@ -109,6 +113,11 @@ class _AdminHomeState extends State<AdminHome> {
           _cashierSales = List<dynamic>.from(data['cashier_sales'] ?? const []);
           _needsAttention =
               List<dynamic>.from(data['needs_attention'] ?? const []);
+          final currentKeys = _needsAttention
+              .whereType<Map>()
+              .map((alert) => _alertKey(Map<String, dynamic>.from(alert)))
+              .toSet();
+          _selectedAlertKeys.removeWhere((key) => !currentKeys.contains(key));
           _isLoading = false;
         });
         return;
@@ -244,7 +253,13 @@ class _AdminHomeState extends State<AdminHome> {
                         children: [
                           _buildSalesSection(),
                           const SizedBox(height: 16),
-                          _sectionTitle('Needs attention'),
+                          Row(
+                            children: [
+                              Expanded(
+                                  child: _sectionTitle('Needs attention')),
+                              _buildAlertFilterControl(),
+                            ],
+                          ),
                           const SizedBox(height: 9),
                           _buildNeedsAttention(),
                         ],
@@ -667,42 +682,434 @@ class _AdminHomeState extends State<AdminHome> {
   Widget _buildNeedsAttention() {
     if (_needsAttention.isEmpty)
       return _whiteMessage('No alerts need attention.');
+    final allAlerts = _needsAttention
+        .whereType<Map>()
+        .map((raw) => Map<String, dynamic>.from(raw))
+        .toList();
+    final alerts = allAlerts.where((alert) {
+      return _alertFilter == 'all' || alert['type'] == _alertFilter;
+    }).toList();
+    if (allAlerts.isEmpty) return _whiteMessage('No alerts need attention.');
+    final allVisibleSelected = alerts.isNotEmpty && alerts.every(
+      (alert) => _selectedAlertKeys.contains(_alertKey(alert)),
+    );
     return Column(
-        children: _needsAttention.map((dynamic raw) {
-      final alert = Map<String, dynamic>.from(raw as Map);
-      return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-              boxShadow: const [
-                BoxShadow(
-                    color: _cardShadow, blurRadius: 8, offset: Offset(0, 3))
-              ]),
-          child: Row(children: [
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
             Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Text('${alert['label'] ?? 'Security alert'}',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 13)),
-                  Text('${alert['name'] ?? 'Account holder'}',
-                      style:
-                          const TextStyle(color: Colors.black54, fontSize: 11)),
-                  Text('${alert['last_at'] ?? ''}',
-                      style:
-                          const TextStyle(color: Colors.black38, fontSize: 9))
-                ])),
-            IconButton(
-                tooltip: 'Email alert',
-                style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD6D2)),
-                onPressed: () => _confirmSendAlert(alert),
-                icon: const Icon(Icons.mail_outline, color: Colors.red))
-          ]));
-    }).toList());
+              child: Text(
+                '${_selectedAlertKeys.length} of ${alerts.length} selected',
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+              onPressed: _isSendingSelectedAlerts ||
+                      _isDeletingSelectedAlerts ||
+                      alerts.isEmpty
+                  ? null
+                  : () => setState(() {
+                        if (allVisibleSelected) {
+                          _selectedAlertKeys.clear();
+                        } else {
+                          _selectedAlertKeys
+                            ..clear()
+                            ..addAll(alerts.map(_alertKey));
+                        }
+                      }),
+              child: Text(allVisibleSelected ? 'Clear all' : 'Select all'),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _selectedAlertKeys.isEmpty ||
+                        _isSendingSelectedAlerts ||
+                        _isDeletingSelectedAlerts
+                    ? null
+                    : _confirmSendSelectedAlerts,
+                icon: _isSendingSelectedAlerts
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.mail_outline, size: 17),
+                label: Text(_isSendingSelectedAlerts
+                    ? 'Sending...'
+                    : 'Send (${_selectedAlertKeys.length})'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: _deepRed,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _selectedAlertKeys.isEmpty ||
+                        _isSendingSelectedAlerts ||
+                        _isDeletingSelectedAlerts
+                    ? null
+                    : _confirmDeleteSelectedAlerts,
+                icon: _isDeletingSelectedAlerts
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.delete_outline, size: 17),
+                label: Text(_isDeletingSelectedAlerts
+                    ? 'Deleting...'
+                    : 'Delete (${_selectedAlertKeys.length})'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white70),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        if (alerts.isEmpty)
+          _whiteMessage('No alerts match this filter.')
+        else
+          ...alerts.map((alert) {
+            final alertKey = _alertKey(alert);
+            final isSelected = _selectedAlertKeys.contains(alertKey);
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: const [
+                  BoxShadow(
+                      color: _cardShadow, blurRadius: 8, offset: Offset(0, 3))
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(15),
+                  onTap: () => _showAlertDetails(alert),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 9),
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          value: isSelected,
+                          activeColor: _deepRed,
+                          visualDensity: VisualDensity.compact,
+                          onChanged: _isSendingSelectedAlerts ||
+                                  _isDeletingSelectedAlerts
+                              ? null
+                              : (selected) => setState(() {
+                                    if (selected == true) {
+                                      _selectedAlertKeys.add(alertKey);
+                                    } else {
+                                      _selectedAlertKeys.remove(alertKey);
+                                    }
+                                  }),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${alert['label'] ?? 'Security alert'}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13)),
+                              Text('${alert['name'] ?? 'Account holder'}',
+                                  style: const TextStyle(
+                                      color: Colors.black54, fontSize: 11)),
+                              Text('${alert['last_at'] ?? ''}',
+                                  style: const TextStyle(
+                                      color: Colors.black38, fontSize: 9))
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Email alert',
+                          style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFFFFD6D2)),
+                          onPressed: _isSendingSelectedAlerts ||
+                                  _isDeletingSelectedAlerts
+                              ? null
+                              : () => _confirmSendAlert(alert),
+                          icon: const Icon(Icons.mail_outline,
+                              color: Colors.red),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  Widget _buildAlertFilterControl() => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.filter_list, color: Colors.white70, size: 20),
+          const SizedBox(width: 4),
+          DropdownButton<String>(
+            value: _alertFilter,
+            dropdownColor: Colors.white,
+            iconEnabledColor: Colors.white,
+            underline: Container(height: 1, color: Colors.white54),
+            style: const TextStyle(color: Colors.white, fontSize: 13),
+            items: const [
+              DropdownMenuItem(
+                value: 'all',
+                child: Text('All alerts',
+                    style: TextStyle(color: Colors.black87)),
+              ),
+              DropdownMenuItem(
+                value: 'login_failures',
+                child: Text('Login failures',
+                    style: TextStyle(color: Colors.black87)),
+              ),
+              DropdownMenuItem(
+                value: 'failed_transactions',
+                child: Text('Incorrect PIN',
+                    style: TextStyle(color: Colors.black87)),
+              ),
+              DropdownMenuItem(
+                value: 'account_setup',
+                child: Text('Account setup',
+                    style: TextStyle(color: Colors.black87)),
+              ),
+            ],
+            onChanged: _isSendingSelectedAlerts || _isDeletingSelectedAlerts
+                ? null
+                : (value) {
+                    if (value == null) return;
+                    setState(() {
+                      _alertFilter = value;
+                      _selectedAlertKeys.clear();
+                    });
+                  },
+          ),
+        ],
+      );
+
+  String _alertKey(Map<String, dynamic> alert) =>
+      alert['alert_id'] != null
+          ? 'incident:${alert['alert_id']}'
+          : '${alert['type']}|${alert['role']}|${alert['source']}|${alert['user_id']}';
+
+  Future<void> _showAlertDetails(Map<String, dynamic> alert) async {
+    final type = alert['type']?.toString() ?? '';
+    final attempts = int.tryParse(alert['attempts']?.toString() ?? '');
+    final explanation = switch (type) {
+      'login_failures' =>
+        'This alert was triggered after multiple unsuccessful password sign-in attempts within a 24-hour window. It stays pending until the email is sent.',
+      'failed_transactions' =>
+        'This alert was triggered after multiple incorrect payment or top-up PIN attempts within a 24-hour window. It stays pending until the email is sent.',
+      'account_setup' =>
+        'This account is still waiting for its initial password setup at least three days after it was created.',
+      _ => 'This alert was flagged for administrator review.',
+    };
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(alert['label']?.toString() ?? 'Alert details'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(explanation),
+              const SizedBox(height: 16),
+              _alertDetailRow(
+                  'Account', alert['name']?.toString() ?? 'Account holder'),
+              _alertDetailRow(
+                  'Account ID', alert['user_id']?.toString() ?? '-'),
+              _alertDetailRow('Account type', alert['role']?.toString() ?? '-'),
+              if (attempts != null)
+                _alertDetailRow('Attempts', '$attempts for this alert'),
+              if (alert['first_at'] != null)
+                _alertDetailRow(
+                  'First attempt',
+                  alert['first_at'].toString(),
+                ),
+              _alertDetailRow(
+                type == 'account_setup' ? 'Account created' : 'Most recent attempt',
+                alert['last_at']?.toString() ?? '-',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _alertDetailRow(String label, String value) => Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 112,
+              child: Text(label,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            Expanded(child: Text(value)),
+          ],
+        ),
+      );
+
+  Future<void> _confirmSendSelectedAlerts() async {
+    final selected = _needsAttention
+        .whereType<Map>()
+        .map((raw) => Map<String, dynamic>.from(raw))
+        .where((alert) => _selectedAlertKeys.contains(_alertKey(alert)))
+        .toList();
+    if (selected.isEmpty) return;
+
+    final shouldSend = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Send selected email alerts?'),
+        content: Text(
+          'Send ${selected.length} email${selected.length == 1 ? '' : 's'} to the selected account holders?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Send emails'),
+          ),
+        ],
+      ),
+    );
+    if (shouldSend != true || !mounted) return;
+
+    setState(() => _isSendingSelectedAlerts = true);
+    var sent = 0;
+    final failed = <String>[];
+    for (final alert in selected) {
+      final key = _alertKey(alert);
+      final result = await _sendAlertRequest(alert);
+      if (result.sent) {
+        sent++;
+        _needsAttention.removeWhere((raw) =>
+            raw is Map && _alertKey(Map<String, dynamic>.from(raw)) == key);
+        _selectedAlertKeys.remove(key);
+        if (mounted) setState(() {});
+      } else {
+        failed.add('${alert['name'] ?? 'Account holder'}: ${result.message}');
+      }
+    }
+    if (!mounted) return;
+    setState(() => _isSendingSelectedAlerts = false);
+    final message = failed.isEmpty
+        ? '$sent email${sent == 1 ? '' : 's'} sent successfully.'
+        : '$sent sent, ${failed.length} failed. ${failed.take(2).join('; ')}${failed.length > 2 ? '; …' : ''}. Failed alerts remain selected for retry.';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _confirmDeleteSelectedAlerts() async {
+    final selected = _needsAttention
+        .whereType<Map>()
+        .map((raw) => Map<String, dynamic>.from(raw))
+        .where((alert) => _selectedAlertKeys.contains(_alertKey(alert)))
+        .toList();
+    if (selected.isEmpty) return;
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete selected alerts?'),
+        content: Text(
+          'Remove ${selected.length} alert${selected.length == 1 ? '' : 's'} from Needs attention? The recorded attempt history will be kept.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete alerts'),
+          ),
+        ],
+      ),
+    );
+    if (shouldDelete != true || !mounted) return;
+
+    setState(() => _isDeletingSelectedAlerts = true);
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConfig.url('dismiss_admin_security_alerts.php')),
+        headers: {
+          'Content-Type': 'application/json',
+          ...AppSessionService.instance.authorizationHeaders,
+        },
+        body: json.encode({
+          'alerts': selected
+              .map((alert) => {
+                    'alert_id': alert['alert_id'],
+                    'type': alert['type'],
+                    'role': alert['role'],
+                    'source': alert['source'],
+                    'user_id': alert['user_id'],
+                  })
+              .toList(),
+        }),
+      );
+      final data = json.decode(response.body);
+      if (response.statusCode != 200 ||
+          data is! Map<String, dynamic> ||
+          data['status'] != 'success') {
+        throw StateError('Could not delete the selected alerts.');
+      }
+
+      final removedKeys = selected.map(_alertKey).toSet();
+      final dismissed = int.tryParse('${data['dismissed'] ?? 0}') ?? 0;
+      final skipped = int.tryParse('${data['skipped'] ?? 0}') ?? 0;
+      if (!mounted) return;
+      setState(() {
+        _needsAttention.removeWhere((raw) =>
+            raw is Map &&
+            removedKeys.contains(_alertKey(Map<String, dynamic>.from(raw))));
+        _selectedAlertKeys.removeAll(removedKeys);
+      });
+      final message = skipped == 0
+          ? '$dismissed alert${dismissed == 1 ? '' : 's'} deleted.'
+          : '$dismissed deleted, $skipped already unavailable.';
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not delete the selected alerts.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isDeletingSelectedAlerts = false);
+    }
   }
 
   Future<void> _confirmSendAlert(Map<String, dynamic> alert) async {
@@ -721,39 +1128,58 @@ class _AdminHomeState extends State<AdminHome> {
                       child: const Text('Send email'))
                 ]));
     if (shouldSend != true || !mounted) return;
+    final result = await _sendAlertRequest(alert);
+    if (result.sent) {
+      if (!mounted) return;
+      setState(() => _needsAttention.removeWhere((raw) {
+            final item = Map<String, dynamic>.from(raw as Map);
+            return _alertKey(item) == _alertKey(alert);
+          }));
+      _selectedAlertKeys.remove(_alertKey(alert));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Email alert sent.')));
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.message)),
+      );
+    }
+  }
+
+  Future<({bool sent, String message})> _sendAlertRequest(
+      Map<String, dynamic> alert) async {
     try {
       final response = await http.post(
-          Uri.parse(ApiConfig.url('send_admin_security_alert.php')),
-          headers: {
-            'Content-Type': 'application/json',
-            ...AppSessionService.instance.authorizationHeaders
-          },
-          body: json.encode({
-            'type': alert['type'],
-            'role': alert['role'],
-            'source': alert['source'],
-            'user_id': alert['user_id']
-          }));
-      final data = json.decode(response.body) as Map<String, dynamic>;
-      if (response.statusCode == 200 && data['status'] == 'success') {
-        if (!mounted) return;
-        setState(() => _needsAttention.removeWhere((raw) {
-              final item = Map<String, dynamic>.from(raw as Map);
-              return item['type'] == alert['type'] &&
-                  item['role'] == alert['role'] &&
-                  item['source'] == alert['source'] &&
-                  item['user_id'] == alert['user_id'];
-            }));
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Email alert sent.')));
-      } else if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(data['message']?.toString() ??
-                'Could not send the email alert.')));
+        Uri.parse(ApiConfig.url('send_admin_security_alert.php')),
+        headers: {
+          'Content-Type': 'application/json',
+          ...AppSessionService.instance.authorizationHeaders,
+        },
+        body: json.encode({
+          'alert_id': alert['alert_id'],
+          'last_attempt_id': alert['last_attempt_id'],
+          'type': alert['type'],
+          'role': alert['role'],
+          'source': alert['source'],
+          'user_id': alert['user_id'],
+        }),
+      );
+      final decoded = json.decode(response.body);
+      final data = decoded is Map<String, dynamic> ? decoded : null;
+      if (response.statusCode == 200 && data?['status'] == 'success') {
+        return (sent: true, message: 'Email alert sent.');
+      }
+      final message = data?['message']?.toString().trim();
+      return (
+        sent: false,
+        message: message == null || message.isEmpty
+            ? 'The server could not send the email. Check the server email configuration and logs.'
+            : message,
+      );
     } catch (_) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not send the email alert.')));
+      return (
+        sent: false,
+        message: 'Could not reach the email service. Check the connection and try again.',
+      );
     }
   }
 

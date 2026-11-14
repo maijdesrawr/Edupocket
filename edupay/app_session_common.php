@@ -360,6 +360,177 @@ function as_record_security_attempt(mysqli $conn, string $role, string $source, 
     $statement->bind_param('ssss', $role, $source, $userId, $type);
     $statement->execute();
     $statement->close();
+
+    try {
+        as_ensure_security_alert_incident($conn, $role, $source, $userId, $type);
+    } catch (Throwable $e) {
+        error_log('Security alert incident could not be created: ' . $e->getMessage());
+    }
+}
+
+function as_ensure_security_alert_incident(
+    mysqli $conn,
+    string $role,
+    string $source,
+    string $userId,
+    string $attemptType
+): void {
+    if (!in_array($attemptType, ['login_password', 'payment_pin', 'topup_pin'], true)
+        || !pc_table_exists($conn, 'admin_security_alert_cursors')
+        || !pc_table_exists($conn, 'admin_security_alert_incidents')
+        || !pc_table_exists($conn, 'admin_dashboard_alert_sends')
+    ) {
+        return;
+    }
+
+    $alertType = $attemptType === 'login_password' ? 'login_failures' : 'failed_transactions';
+    $ownsTransaction = (($conn->server_status & 1) === 0);
+    if ($ownsTransaction && !$conn->begin_transaction()) {
+        throw new RuntimeException('Security alert state could not be locked.');
+    }
+
+    try {
+        $createCursor = pc_prepare(
+            $conn,
+            'INSERT IGNORE INTO admin_security_alert_cursors '
+                . '(account_role, account_source, user_id, attempt_type) VALUES (?, ?, ?, ?)'
+        );
+        $createCursor->bind_param('ssss', $role, $source, $userId, $attemptType);
+        $createCursor->execute();
+        $createCursor->close();
+
+        $lockCursor = pc_prepare(
+            $conn,
+            'SELECT cursor_id, last_alerted_attempt_id '
+                . 'FROM admin_security_alert_cursors '
+                . 'WHERE account_role = ? AND account_source = ? AND user_id = ? AND attempt_type = ? '
+                . 'LIMIT 1 FOR UPDATE'
+        );
+        $lockCursor->bind_param('ssss', $role, $source, $userId, $attemptType);
+        $lockCursor->execute();
+        $cursor = $lockCursor->get_result()->fetch_assoc();
+        $lockCursor->close();
+        if (!$cursor) {
+            throw new RuntimeException('Security alert state could not be read.');
+        }
+
+        $cursorId = (int)$cursor['cursor_id'];
+        $lastAlertedAttemptId = (int)$cursor['last_alerted_attempt_id'];
+
+        $sentCursor = pc_prepare(
+            $conn,
+            'SELECT COALESCE(MAX(last_attempt_id), 0) last_attempt_id '
+                . 'FROM admin_dashboard_alert_sends '
+                . 'WHERE alert_type = ? AND account_role = ? AND account_source = ? AND user_id = ?'
+        );
+        $sentCursor->bind_param('ssss', $alertType, $role, $source, $userId);
+        $sentCursor->execute();
+        $sentRow = $sentCursor->get_result()->fetch_assoc();
+        $sentCursor->close();
+        $lastAlertedAttemptId = max(
+            $lastAlertedAttemptId,
+            (int)($sentRow['last_attempt_id'] ?? 0)
+        );
+
+        $summary = pc_prepare(
+            $conn,
+            'SELECT COUNT(*) attempt_count, MIN(attempt_id) first_attempt_id, '
+                . 'MAX(attempt_id) last_attempt_id, MIN(created_at) first_at, MAX(created_at) last_at '
+                . 'FROM admin_security_attempts '
+                . 'WHERE account_role = ? AND account_source = ? AND user_id = ? AND attempt_type = ? '
+                . 'AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) AND attempt_id > ?'
+        );
+        $summary->bind_param('ssssi', $role, $source, $userId, $attemptType, $lastAlertedAttemptId);
+        $summary->execute();
+        $attempts = $summary->get_result()->fetch_assoc();
+        $summary->close();
+
+        $attemptCount = (int)($attempts['attempt_count'] ?? 0);
+        if ($attemptCount >= 3) {
+            $firstAttemptId = (int)$attempts['first_attempt_id'];
+            $lastAttemptId = (int)$attempts['last_attempt_id'];
+            $firstAt = (string)$attempts['first_at'];
+            $lastAt = (string)$attempts['last_at'];
+
+            $createIncident = pc_prepare(
+                $conn,
+                'INSERT IGNORE INTO admin_security_alert_incidents '
+                    . '(alert_type, account_role, account_source, user_id, attempt_type, attempt_count, '
+                    . 'first_attempt_id, last_attempt_id, first_at, last_at) '
+                    . 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+            $createIncident->bind_param(
+                'sssssiiiss',
+                $alertType,
+                $role,
+                $source,
+                $userId,
+                $attemptType,
+                $attemptCount,
+                $firstAttemptId,
+                $lastAttemptId,
+                $firstAt,
+                $lastAt
+            );
+            $createIncident->execute();
+            $createIncident->close();
+
+            $advanceCursor = pc_prepare(
+                $conn,
+                'UPDATE admin_security_alert_cursors SET last_alerted_attempt_id = ? WHERE cursor_id = ?'
+            );
+            $advanceCursor->bind_param('ii', $lastAttemptId, $cursorId);
+            $advanceCursor->execute();
+            $advanceCursor->close();
+        } elseif ($lastAlertedAttemptId > (int)$cursor['last_alerted_attempt_id']) {
+            $advanceCursor = pc_prepare(
+                $conn,
+                'UPDATE admin_security_alert_cursors SET last_alerted_attempt_id = ? WHERE cursor_id = ?'
+            );
+            $advanceCursor->bind_param('ii', $lastAlertedAttemptId, $cursorId);
+            $advanceCursor->execute();
+            $advanceCursor->close();
+        }
+
+        if ($ownsTransaction) {
+            $conn->commit();
+        }
+    } catch (Throwable $e) {
+        if ($ownsTransaction && (($conn->server_status & 1) !== 0)) {
+            $conn->rollback();
+        }
+        throw $e;
+    }
+}
+
+function as_sync_recent_security_alert_incidents(mysqli $conn): void
+{
+    if (!pc_table_exists($conn, 'admin_security_attempts')
+        || !pc_table_exists($conn, 'admin_security_alert_cursors')
+        || !pc_table_exists($conn, 'admin_security_alert_incidents')
+    ) {
+        return;
+    }
+
+    $result = $conn->query(
+        'SELECT account_role, account_source, user_id, attempt_type, COUNT(*) attempt_count '
+            . 'FROM admin_security_attempts WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) '
+            . 'GROUP BY account_role, account_source, user_id, attempt_type HAVING COUNT(*) >= 3'
+    );
+    if (!$result) {
+        throw new RuntimeException('Pending security alerts could not be synchronized.');
+    }
+
+    while ($row = $result->fetch_assoc()) {
+        as_ensure_security_alert_incident(
+            $conn,
+            (string)$row['account_role'],
+            (string)$row['account_source'],
+            (string)$row['user_id'],
+            (string)$row['attempt_type']
+        );
+    }
+    $result->free();
 }
 
 function as_issue_session(

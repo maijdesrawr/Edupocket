@@ -39,11 +39,19 @@ try {
 
     $newStatus = $action === 'lock' ? 1 : 0;
 
-    account_query(
-        $conn,
-        'UPDATE students SET is_locked = ? WHERE student_num = ?',
-        [$newStatus, $studentNum]
-    );
+    if ($action === 'unlock') {
+        account_query(
+            $conn,
+            'UPDATE students SET is_locked = 0, failed_attempts = 0 WHERE student_num = ?',
+            [$studentNum]
+        );
+    } else {
+        account_query(
+            $conn,
+            'UPDATE students SET is_locked = 1 WHERE student_num = ?',
+            [$studentNum]
+        );
+    }
 
     $event = $action === 'lock'
         ? 'student_account_manually_locked'

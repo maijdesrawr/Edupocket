@@ -12,6 +12,8 @@ import 'forgot_password_page.dart';
 import 'login_service.dart';
 import 'parent.dart';
 import 'pos_dashboard_screen.dart';
+import 'profile_email_service.dart';
+import 'profile_verified_email.dart';
 import 'student_dashboard.dart';
 import 'transaction_notification_service.dart';
 
@@ -208,6 +210,70 @@ class _LoginPageState extends State<LoginPage> {
       userId: user.id,
       expiresAtEpochSeconds: user.sessionExpiresAtEpochSeconds,
     );
+    if (!mounted) return;
+
+    const emailRequiredRoles = {'parent', 'canteen', 'cashier', 'admin'};
+    if (emailRequiredRoles.contains(user.role)) {
+      final emailService = ProfileEmailService();
+      try {
+        var emailStatus = await emailService.getStatus(
+          role: user.role,
+          id: user.id,
+        );
+        if (!emailStatus.verified) {
+          final setupCompleted = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(
+              builder: (_) => ProfileVerifiedEmailPage(
+                role: user.role,
+                userId: user.id,
+                userName: user.name,
+              ),
+            ),
+          );
+          if (!mounted) return;
+          if (setupCompleted != true) {
+            await AppSessionService.instance.endSession(
+              reason: 'first_login_email_setup_required',
+            );
+            if (mounted) {
+              setState(() => _error =
+                  'Verify an email address before continuing.');
+            }
+            return;
+          }
+          emailStatus = await emailService.getStatus(
+            role: user.role,
+            id: user.id,
+          );
+          if (!emailStatus.verified) {
+            await AppSessionService.instance.endSession(
+              reason: 'first_login_email_setup_incomplete',
+            );
+            if (mounted) {
+              setState(() => _error =
+                  'Verify an email address before continuing.');
+            }
+            return;
+          }
+        }
+      } on ProfileEmailException catch (error) {
+        await AppSessionService.instance.endSession(
+          reason: 'first_login_email_setup_unavailable',
+        );
+        if (mounted) setState(() => _error = error.message);
+        return;
+      } catch (_) {
+        await AppSessionService.instance.endSession(
+          reason: 'first_login_email_setup_unavailable',
+        );
+        if (mounted) {
+          setState(() => _error =
+              'Email verification is required before continuing. Please try again.');
+        }
+        return;
+      }
+    }
+
     if (!mounted) return;
     unawaited(
       TransactionNotificationService.activate(

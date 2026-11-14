@@ -19,6 +19,11 @@ try {
     if (($session['role'] ?? '') !== 'admin') {
         pc_reject('Administrator access is required.');
     }
+    try {
+        as_sync_recent_security_alert_incidents($conn);
+    } catch (Throwable $syncError) {
+        error_log('Admin security alert synchronization failed: ' . $syncError->getMessage());
+    }
 
     $period = strtolower(trim((string)($_GET['period'] ?? 'all')));
     $sort = strtolower(trim((string)($_GET['sort'] ?? 'sales')));
@@ -111,13 +116,36 @@ try {
         $name=trim((string)($row['n']??'Account holder'));
         return $source==='cashiers' ? $name : receipt_mask_name_parts((string)($row['first_name']??''),(string)($row['last_name']??''));
     };
-    if (pc_table_exists($conn,'admin_security_attempts') && pc_table_exists($conn,'admin_dashboard_alert_sends')) {
+    $alertDisplayName = static function(string $source, string $id) use ($conn): string {
+        $map=['students'=>['student_num','Fname'],'parents'=>['parent_id','Fname'],'cashiers'=>['cashier_id','Fname']];
+        if(!isset($map[$source])) return 'Account holder';
+        [$key]=$map[$source];
+        $select=$source==='cashiers'
+            ? "COALESCE(NULLIF(TRIM(Fname),''),'Cashier') AS n"
+            : "COALESCE(NULLIF(TRIM(CONCAT_WS(' ',NULLIF(first_name,''),NULLIF(last_name,''))),''),NULLIF(TRIM(Fname),''),'Account holder') AS n";
+        $st=$conn->prepare("SELECT $select FROM `$source` WHERE `$key`=? LIMIT 1");
+        if(!$st) return 'Account holder';
+        $st->bind_param('s',$id); $st->execute(); $row=$st->get_result()->fetch_assoc(); $st->close();
+        return trim((string)($row['n']??'Account holder'));
+    };
+    if (pc_table_exists($conn,'admin_security_alert_incidents')) {
+        $dismissalJoin = pc_table_exists($conn,'admin_dashboard_alert_dismissals')
+            ? "LEFT JOIN admin_dashboard_alert_dismissals x ON x.alert_type=i.alert_type AND x.account_role=i.account_role AND x.account_source=i.account_source AND x.user_id=i.user_id AND x.alert_id=i.alert_id"
+            : '';
+        $dismissalFilter = $dismissalJoin !== '' ? ' AND x.dismissal_id IS NULL' : '';
+        $res=$conn->query("SELECT i.alert_id,i.alert_type,i.account_role,i.account_source,i.user_id,i.attempt_count,i.first_at,i.last_at,i.last_attempt_id FROM admin_security_alert_incidents i $dismissalJoin WHERE i.email_sent_at IS NULL $dismissalFilter ORDER BY i.created_at DESC LIMIT 40");
+        if($res) while($r=$res->fetch_assoc()) $needs[]=['alert_id'=>(int)$r['alert_id'],'type'=>$r['alert_type'],'role'=>$r['account_role'],'source'=>$r['account_source'],'user_id'=>$r['user_id'],'attempts'=>(int)$r['attempt_count'],'last_attempt_id'=>(int)$r['last_attempt_id'],'first_at'=>$r['first_at'],'last_at'=>$r['last_at'],'name'=>$alertDisplayName((string)$r['account_source'],(string)$r['user_id']),'label'=>$r['alert_type']==='login_failures'?'Repeated login failures':'Repeated incorrect PIN attempts'];
+    } elseif (pc_table_exists($conn,'admin_security_attempts') && pc_table_exists($conn,'admin_dashboard_alert_sends')) {
         $res=$conn->query("SELECT a.account_role,a.account_source,a.user_id,a.attempt_type,COUNT(*) attempts,MAX(a.created_at) last_at,MAX(a.attempt_id) last_attempt_id FROM admin_security_attempts a LEFT JOIN admin_dashboard_alert_sends d ON d.alert_type=CASE WHEN a.attempt_type='login_password' THEN 'login_failures' ELSE 'failed_transactions' END AND d.account_role=a.account_role AND d.account_source=a.account_source AND d.user_id=a.user_id WHERE a.created_at>=DATE_SUB(NOW(),INTERVAL 24 HOUR) AND a.attempt_id>COALESCE(d.last_attempt_id,0) GROUP BY a.account_role,a.account_source,a.user_id,a.attempt_type HAVING COUNT(*)>=3 ORDER BY last_at DESC LIMIT 40");
-        if($res) while($r=$res->fetch_assoc()) $needs[]=['type'=>$r['attempt_type']==='login_password'?'login_failures':'failed_transactions','role'=>$r['account_role'],'source'=>$r['account_source'],'user_id'=>$r['user_id'],'attempts'=>(int)$r['attempts'],'last_attempt_id'=>(int)$r['last_attempt_id'],'last_at'=>$r['last_at'],'name'=>$displayName((string)$r['account_source'],(string)$r['user_id']),'label'=>$r['attempt_type']==='login_password'?'Repeated login failures':'Repeated incorrect PIN attempts'];
+        if($res) while($r=$res->fetch_assoc()) $needs[]=['type'=>$r['attempt_type']==='login_password'?'login_failures':'failed_transactions','role'=>$r['account_role'],'source'=>$r['account_source'],'user_id'=>$r['user_id'],'attempts'=>(int)$r['attempts'],'last_attempt_id'=>(int)$r['last_attempt_id'],'last_at'=>$r['last_at'],'name'=>$alertDisplayName((string)$r['account_source'],(string)$r['user_id']),'label'=>$r['attempt_type']==='login_password'?'Repeated login failures':'Repeated incorrect PIN attempts'];
     }
     if (pc_table_exists($conn,'app_activity_events') && pc_table_exists($conn,'admin_dashboard_alert_sends')) {
-        $res=$conn->query("SELECT JSON_UNQUOTE(JSON_EXTRACT(e.metadata_json,'$.student_num')) student_num,e.created_at,a.Fname,a.first_name,a.last_name FROM app_activity_events e JOIN students a ON a.student_num=JSON_UNQUOTE(JSON_EXTRACT(e.metadata_json,'$.student_num')) LEFT JOIN parent_student_link l ON l.student_num=a.student_num LEFT JOIN parents p ON p.parent_id=l.parent_id LEFT JOIN admin_dashboard_alert_sends d ON d.alert_type='account_setup' AND d.account_role='student' AND d.account_source='students' AND d.user_id=a.student_num WHERE e.event_name IN ('student_family_account_created','student_account_created') AND e.created_at<=DATE_SUB(NOW(),INTERVAL 3 DAY) AND (COALESCE(a.password_changed,0)=0 OR COALESCE(p.password_changed,1)=0) AND d.send_id IS NULL ORDER BY e.created_at DESC LIMIT 40");
-        if($res) while($r=$res->fetch_assoc()) $needs[]=['type'=>'account_setup','role'=>'student','source'=>'students','user_id'=>$r['student_num'],'last_at'=>$r['created_at'],'label'=>'Awaiting account setup','name'=>receipt_mask_name_parts((string)($r['first_name']??''),(string)($r['last_name']??''))];
+        $dismissalJoin = pc_table_exists($conn,'admin_dashboard_alert_dismissals')
+            ? "LEFT JOIN admin_dashboard_alert_dismissals x ON x.alert_type='account_setup' AND x.account_role='student' AND x.account_source='students' AND x.user_id=a.student_num AND x.alert_id=0 AND x.dismissed_at>DATE_SUB(NOW(),INTERVAL 7 DAY)"
+            : '';
+        $dismissalFilter = $dismissalJoin !== '' ? ' AND x.dismissal_id IS NULL' : '';
+        $res=$conn->query("SELECT created.student_num,created.created_at,COALESCE(NULLIF(TRIM(CONCAT_WS(' ',NULLIF(a.first_name,''),NULLIF(a.last_name,''))),''),NULLIF(TRIM(a.Fname),''),'Student') name FROM (SELECT JSON_UNQUOTE(JSON_EXTRACT(metadata_json,'$.student_num')) student_num,MAX(created_at) created_at FROM app_activity_events WHERE event_name IN ('student_family_account_created','student_account_created') AND created_at<=DATE_SUB(NOW(),INTERVAL 3 DAY) GROUP BY JSON_UNQUOTE(JSON_EXTRACT(metadata_json,'$.student_num'))) created JOIN students a ON a.student_num=created.student_num LEFT JOIN admin_dashboard_alert_sends d ON d.alert_type='account_setup' AND d.account_role='student' AND d.account_source='students' AND d.user_id=a.student_num $dismissalJoin WHERE (COALESCE(a.password_changed,0)=0 OR EXISTS (SELECT 1 FROM parent_student_link l JOIN parents p ON p.parent_id=l.parent_id WHERE l.student_num=a.student_num AND COALESCE(p.password_changed,0)=0)) AND (d.send_id IS NULL OR d.sent_at<=DATE_SUB(NOW(),INTERVAL 7 DAY)) $dismissalFilter ORDER BY created.created_at DESC LIMIT 40");
+        if($res) while($r=$res->fetch_assoc()) $needs[]=['type'=>'account_setup','role'=>'student','source'=>'students','user_id'=>$r['student_num'],'last_at'=>$r['created_at'],'label'=>'Awaiting account setup','name'=>trim((string)($r['name']??'Student'))];
     }
     $audit=[];
     if (pc_table_exists($conn,'app_activity_events')) {
